@@ -21,10 +21,10 @@ jobs:
         distribution: 'adopt'
         cache: maven
         server-id: ossrh
-        server-username: OSSRH_USERNAME
-        server-password: OSSRH_PASSWORD
-        gpg-passphrase: GPG_PASSPHRASE
+        server-username: ${{ secrets.OSSRH_USERNAME }}
+        server-password: ${{ secrets.OSSRH_PASSWORD }}
         gpg-private-key: ${{ secrets.OSSRH_GPG_SECRET_KEY }}
+        gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
     - name: Build with Maven
       run: ./mvnw -B package --file pom.xml
@@ -37,7 +37,3 @@ jobs:
         git config user.name "GitHub Actions"
 
         ./mvnw -B release:prepare release:perform -Dusername=$GITHUB_ACTOR -Dpassword=$GITHUB_TOKEN -P release
-      env:
-        OSSRH_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-        OSSRH_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-        GPG_PASSPHRASE: ${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }}
