@@ -2,6 +2,7 @@ package org.wcdevs.blog.cdk;
 
 import java.util.Collections;
 import java.util.Objects;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -43,31 +44,31 @@ public final class DockerRepository extends Construct {
    * @param idArg    Scoped id of the ECR.
    */
   public static DockerRepository newInstance(Construct scopeArg, String idArg,
-                                             InputParameter inputParameter) {
+                                             InputParameters inputParameters) {
     Construct scope = Objects.requireNonNull(scopeArg);
     String id = Objects.requireNonNull(idArg);
-    InputParameter inParameter = Objects.requireNonNull(inputParameter);
+    InputParameters inParameters = Objects.requireNonNull(inputParameters);
 
     DockerRepository dockerRepository = new DockerRepository(scope, id);
     LifecycleRule lifecycleRule = LifecycleRule.builder()
                                                .rulePriority(LCR_PRIORITY)
-                                               .description(descriptionFrom(inParameter))
-                                               .maxImageCount(inParameter.maxImageCount)
+                                               .description(descriptionFrom(inParameters))
+                                               .maxImageCount(inParameters.maxImageCount)
                                                .build();
     dockerRepository.ecRepository = Repository.Builder
         .create(dockerRepository, string("ecRepository-", id))
-        .imageTagMutability(inParameter.tagMutability())
-        .repositoryName(inParameter.repositoryName)
-        .removalPolicy(inParameter.removalPolicy())
+        .imageTagMutability(inParameters.tagMutability())
+        .repositoryName(inParameters.repositoryName)
+        .removalPolicy(inParameters.removalPolicy())
         .lifecycleRules(Collections.singletonList(lifecycleRule))
         .build();
-    dockerRepository.ecRepository.grantPullPush(new AccountPrincipal(inParameter.accountId));
+    dockerRepository.ecRepository.grantPullPush(new AccountPrincipal(inParameters.accountId));
 
     return dockerRepository;
   }
 
-  private static String descriptionFrom(InputParameter inParameter) {
-    String description = "Docker ECR '%s' will hold a maximum of % images. It will %s retained on "
+  private static String descriptionFrom(InputParameters inParameter) {
+    String description = "Docker ECR '%s' will hold a maximum of %s images. It will %s retained on "
                          + "deletion and tags are %s";
     return format(description, inParameter.repositoryName, inParameter.maxImageCount,
                   inParameter.retainRegistryOnDelete ? "be" : "not be",
@@ -77,9 +78,14 @@ public final class DockerRepository extends Construct {
   /**
    * Holds the input parameters to build a new {@link DockerRepository}.
    */
+  @Getter(AccessLevel.PACKAGE)
   @AllArgsConstructor
   @RequiredArgsConstructor
-  public static class InputParameter {
+  public static class InputParameters {
+    static final int DEFAULT_MAX_IMAGE_COUNT = 10;
+    static final boolean DEFAULT_RETAIN_POLICY = true;
+    static final boolean DEFAULT_INMUTABLE_TAGS = true;
+
     /**
      * Name of the docker repository to be created.
      */
@@ -91,21 +97,21 @@ public final class DockerRepository extends Construct {
     /**
      * Max number of images to keep in the repo.
      */
-    private int maxImageCount = 10;
+    private int maxImageCount = DEFAULT_MAX_IMAGE_COUNT;
     /**
      * Whether the container registry should be destroyed or retained on deletion.
      */
-    private boolean retainRegistryOnDelete = true;
+    private boolean retainRegistryOnDelete = DEFAULT_RETAIN_POLICY;
     /**
      * Whether tags shall be mutable or not.
      */
-    private boolean inmutableTags = true;
+    private boolean inmutableTags = DEFAULT_INMUTABLE_TAGS;
 
-    private RemovalPolicy removalPolicy() {
+    RemovalPolicy removalPolicy() {
       return retainRegistryOnDelete ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
     }
 
-    private TagMutability tagMutability() {
+    TagMutability tagMutability() {
       return inmutableTags ? TagMutability.IMMUTABLE : TagMutability.MUTABLE;
     }
   }
