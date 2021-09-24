@@ -7,7 +7,7 @@ name: Build, Sign and Release with Maven
 on: [push]
 
 jobs:
-  build:
+  build-and-deploy-if-release-branch:
     runs-on: ubuntu-latest
     steps:
 
