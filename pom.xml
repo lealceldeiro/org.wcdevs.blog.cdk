@@ -6,7 +6,7 @@
 
   <groupId>org.wcdevs.blog</groupId>
   <artifactId>cdk</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.1</version>
   <packaging>jar</packaging>
 
   <name>wcDevs.org CDK Constructs</name>
@@ -51,7 +51,7 @@
     <developerConnection>scm:git:https://github.com/lealceldeiro/org.wcdevs.blog.cdk.git
     </developerConnection>
     <url>https://github.com/lealceldeiro/org.wcdevs.blog.cdk</url>
-    <tag>org.wcdevs.blog.cdk-0.0.2</tag>
+    <tag>org.wcdevs.blog.cdk-0.0.1</tag>
   </scm>
 
   <distributionManagement>
