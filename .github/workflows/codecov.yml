@@ -10,7 +10,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: "Codecov"
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@v2
         with:
           files: ./target/site/jacoco/jacoco.xml
           flags: unittests
