@@ -29,6 +29,14 @@ jobs:
     - name: Build with Maven
       run: ./mvnw -B package --file pom.xml
 
+    - name: "Codecov"
+      uses: codecov/codecov-action@v2
+      with:
+        files: ./target/site/jacoco/jacoco.xml
+        flags: unittests
+        fail_ci_if_error: true
+        verbose: true
+
     - name: "Publish to Maven Central Repository"
       # publish to Maven Central on pushes to "release" branch
       if: github.ref == 'refs/heads/release'
