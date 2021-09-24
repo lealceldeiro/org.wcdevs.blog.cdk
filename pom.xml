@@ -68,13 +68,7 @@
   <profiles>
     <profile>
       <!--Some ref: https://dzone.com/articles/publish-your-artifacts-to-maven-central-->
-      <id>release-and-sign</id>
-      <activation>
-        <property>
-          <name>performRelease</name>
-          <value>true</value>
-        </property>
-      </activation>
+      <id>release</id>
       <build>
         <plugins>
           <plugin>
@@ -88,6 +82,12 @@
                 <goals>
                   <goal>sign</goal>
                 </goals>
+                <configuration>
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
               </execution>
             </executions>
           </plugin>
@@ -180,12 +180,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-release-plugin</artifactId>
         <version>3.0.0-M1</version>
-        <configuration>
-          <localCheckout>true</localCheckout>
-          <pushChanges>false</pushChanges>
-          <mavenExecutorId>forked-path</mavenExecutorId>
-          <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
