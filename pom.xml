@@ -83,6 +83,8 @@
                   <goal>sign</goal>
                 </goals>
                 <configuration>
+                  <!-- Prevent gpg from using pinentry programs: -->
+                  <!-- https://github.com/actions/setup-java/issues/91#issuecomment-674028464 -->
                   <gpgArguments>
                     <arg>--pinentry-mode</arg>
                     <arg>loopback</arg>
