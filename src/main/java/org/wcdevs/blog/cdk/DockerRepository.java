@@ -75,12 +75,24 @@ public final class DockerRepository extends Construct {
                   inParameter.inmutableTags ? "inmutables" : "mutables");
   }
 
+  public static InputParameters newInputParameters(String repositoryName, String accountId) {
+    return new InputParameters(repositoryName, accountId);
+  }
+
+  public static InputParameters newInputParameters(String repositoryName, String accountId,
+                                                   int maxImageCount,
+                                                   boolean retainRegistryOnDelete,
+                                                   boolean inmutableTags) {
+    return new InputParameters(repositoryName, accountId, maxImageCount, retainRegistryOnDelete,
+                               inmutableTags);
+  }
+
   /**
    * Holds the input parameters to build a new {@link DockerRepository}.
    */
   @Getter(AccessLevel.PACKAGE)
-  @AllArgsConstructor
-  @RequiredArgsConstructor
+  @AllArgsConstructor(access = AccessLevel.PACKAGE)
+  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
   public static class InputParameters {
     static final int DEFAULT_MAX_IMAGE_COUNT = 10;
     static final boolean DEFAULT_RETAIN_POLICY = true;
