@@ -1,17 +1,22 @@
 # This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
 
-name: Maven Release
+name: Maven Build
 
 # run the CI build on all PRs and branches
-on: [push]
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/**'
 
 jobs:
-  build-and-deploy-if-release-branch:
+  build:
     runs-on: ubuntu-latest
     steps:
 
-    - name: "Checkout"
+    - name: Checkout
       uses: actions/checkout@v2
 
     - name: Set up JDK 11
@@ -26,10 +31,10 @@ jobs:
         gpg-private-key: ${{ secrets.OSSRH_GPG_SECRET_KEY }}
         gpg-passphrase: GPG_PASSPHRASE
 
-    - name: Build with Maven
+    - name:  Maven Build
       run: ./mvnw -B package --file pom.xml
 
-    - name: "Codecov"
+    - name: Codecov
       uses: codecov/codecov-action@v2
       with:
         files: ./target/site/jacoco/jacoco.xml
@@ -37,7 +42,7 @@ jobs:
         fail_ci_if_error: true
         verbose: true
 
-    - name: "Publish to Maven Central Repository"
+    - name: Publish to Maven Repository
       # publish to Maven Central on pushes to "release" branch
       if: github.ref == 'refs/heads/release'
       run: |

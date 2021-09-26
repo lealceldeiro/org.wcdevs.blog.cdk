@@ -1,5 +1,7 @@
 package org.wcdevs.blog.cdk;
 
+import java.security.SecureRandom;
+import java.util.Random;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +48,20 @@ class DockerRepositoryTest {
                                          mock(DockerRepository.InputParameters.class));
       Assertions.assertNotNull(actual);
     }
+  }
+
+  @Test
+  void newInputParameters() {
+    Assertions.assertNotNull(DockerRepository.newInputParameters(randomString(), randomString()));
+  }
+
+  @Test
+  void newInputParametersOverload() {
+    Random random = new SecureRandom();
+    Assertions.assertNotNull(DockerRepository.newInputParameters(randomString(), randomString(),
+                                                                 random.nextInt(),
+                                                                 random.nextBoolean(),
+                                                                 random.nextBoolean()));
   }
 
   private String randomString() {
