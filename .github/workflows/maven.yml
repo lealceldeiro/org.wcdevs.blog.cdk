@@ -56,7 +56,7 @@ jobs:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     - name: Create GitHub Release
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/release'
       uses: marvinpinto/action-automatic-releases@v1.2.1
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
