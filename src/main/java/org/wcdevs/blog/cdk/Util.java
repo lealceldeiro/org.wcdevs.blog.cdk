@@ -14,7 +14,7 @@ final class Util {
                  .collect(Collectors.joining());
   }
 
-  static String joinedString(String joiner, Object... values) {
+  static String joinedString(CharSequence joiner, Object... values) {
     return Arrays.stream(values)
                  .filter(Objects::nonNull)
                  .map(Object::toString)
