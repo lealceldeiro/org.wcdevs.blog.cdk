@@ -4,7 +4,12 @@
 name: Maven Build
 
 # run the CI build on all PRs and branches
-on: [push]
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/**'
 
 jobs:
   build:
