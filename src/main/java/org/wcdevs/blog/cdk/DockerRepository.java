@@ -1,11 +1,10 @@
 package org.wcdevs.blog.cdk;
 
-import java.util.Collections;
-import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.services.ecr.IRepository;
@@ -14,8 +13,11 @@ import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecr.TagMutability;
 import software.amazon.awscdk.services.iam.AccountPrincipal;
 
+import java.util.Objects;
+
 import static java.lang.String.format;
-import static org.wcdevs.blog.cdk.Util.*;
+import static java.util.Collections.singletonList;
+import static org.wcdevs.blog.cdk.Util.string;
 
 /**
  * Holds the constructs to deploy an ECR repository.
@@ -31,6 +33,7 @@ public final class DockerRepository extends Construct {
    * ECR Repository.
    */
   @Getter
+  @Setter(AccessLevel.PRIVATE)
   private IRepository ecRepository;
 
   private DockerRepository(Construct scope, String id) {
@@ -53,16 +56,18 @@ public final class DockerRepository extends Construct {
     LifecycleRule lifecycleRule = LifecycleRule.builder()
                                                .rulePriority(LCR_PRIORITY)
                                                .description(descriptionFrom(inParameters))
-                                               .maxImageCount(inParameters.maxImageCount)
+                                               .maxImageCount(inParameters.getMaxImageCount())
                                                .build();
-    dockerRepository.ecRepository = Repository.Builder
-        .create(dockerRepository, string("ecRepository-", id))
-        .imageTagMutability(inParameters.tagMutability())
-        .repositoryName(inParameters.repositoryName)
-        .removalPolicy(inParameters.removalPolicy())
-        .lifecycleRules(Collections.singletonList(lifecycleRule))
-        .build();
-    dockerRepository.ecRepository.grantPullPush(new AccountPrincipal(inParameters.accountId));
+    Repository ecRepository = Repository.Builder.create(dockerRepository,
+                                                        string("ecRepository", id))
+                                                .imageTagMutability(inParameters.tagMutability())
+                                                .repositoryName(inParameters.getRepositoryName())
+                                                .removalPolicy(inParameters.removalPolicy())
+                                                .lifecycleRules(singletonList(lifecycleRule))
+                                                .build();
+    ecRepository.grantPullPush(new AccountPrincipal(inParameters.getAccountId()));
+
+    dockerRepository.setEcRepository(ecRepository);
 
     return dockerRepository;
   }
@@ -70,9 +75,9 @@ public final class DockerRepository extends Construct {
   private static String descriptionFrom(InputParameters inParameter) {
     String description = "Docker ECR '%s' will hold a maximum of %s images. It will %s retained on "
                          + "deletion and tags are %s";
-    return format(description, inParameter.repositoryName, inParameter.maxImageCount,
-                  inParameter.retainRegistryOnDelete ? "be" : "not be",
-                  inParameter.inmutableTags ? "inmutables" : "mutables");
+    return format(description, inParameter.getRepositoryName(), inParameter.getMaxImageCount(),
+                  (inParameter.isRetainRegistryOnDelete() ? "be" : "not be"),
+                  (inParameter.isInmutableTags() ? "inmutables" : "mutables"));
   }
 
   public static InputParameters newInputParameters(String repositoryName, String accountId) {
