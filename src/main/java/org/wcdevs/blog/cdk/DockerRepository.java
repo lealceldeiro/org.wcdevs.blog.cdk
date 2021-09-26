@@ -98,7 +98,7 @@ public final class DockerRepository extends Construct {
   @Getter(AccessLevel.PACKAGE)
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-  public static class InputParameters {
+  public static final class InputParameters {
     static final int DEFAULT_MAX_IMAGE_COUNT = 10;
     static final boolean DEFAULT_RETAIN_POLICY = true;
     static final boolean DEFAULT_INMUTABLE_TAGS = true;
