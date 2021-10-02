@@ -22,8 +22,6 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationTargetG
 import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationListener;
 import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationLoadBalancer;
-import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationTargetGroup;
-import software.amazon.awscdk.services.elasticloadbalancingv2.IListenerCertificate;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCertificate;
 import software.amazon.awscdk.services.elasticloadbalancingv2.TargetType;
 
@@ -37,6 +35,9 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 @Setter(AccessLevel.PRIVATE)
 public final class Network extends Construct {
   private static final String CLUSTER_NAME = "ecsCluster";
+  private static final String ALL_IP_PROTOCOLS = "-1";
+  // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+  private static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
 
   private String environmentName;
   private IVpc vpc;
@@ -44,40 +45,52 @@ public final class Network extends Construct {
   private ISecurityGroup loadBalancerSecurityGroup;
   private IApplicationLoadBalancer loadBalancer;
   private IApplicationListener httpListener;
-  private Optional<IApplicationListener> httpsListener;
+  private IApplicationListener httpsListener;
 
   private Network(Construct scope, String id) {
     super(scope, id);
   }
 
-  public static Network newInstance(Construct scopeArg, String idArg, String envName,
+  /**
+   * Creates a new {@link Network} from a given scope, network id, environment name and
+   * input parameters.
+   *
+   * @param scope           Scope in which the network will be defined.
+   * @param id              Network id.
+   * @param environmentName Environment name.
+   * @param inputParameters Input parameters to build the network.
+   *
+   * @return The newly create network.
+   */
+  public static Network newInstance(Construct scope, String id, String environmentName,
                                     InputParameters inputParameters) {
-    Construct scope = Objects.requireNonNull(scopeArg);
-    String id = Objects.requireNonNull(idArg);
-    String environmentName = Objects.requireNonNull(envName);
+    var validScope = Objects.requireNonNull(scope);
+    var validId = Objects.requireNonNull(id);
+    var envName = Objects.requireNonNull(environmentName);
+    var validInParams = Objects.requireNonNull(inputParameters);
 
-    Network network = new Network(scope, id);
-    network.setEnvironmentName(environmentName);
+    var network = new Network(validScope, validId);
+    network.setEnvironmentName(envName);
 
-    IVpc vpc = vpcFrom(network, environmentName, inputParameters.getNatGatewayNumber(),
-                       inputParameters.getMaxAZs());
+    var vpc = vpcFrom(network, envName, validInParams.getNatGatewayNumber(),
+                      validInParams.getMaxAZs());
     network.setVpc(vpc);
 
-    ICluster cluster = clusterFrom(network, vpc, joinedString("-", environmentName, CLUSTER_NAME));
+    var cluster = clusterFrom(network, vpc, joinedString("-", envName, CLUSTER_NAME));
     network.setEcsCluster(cluster);
 
-    LoadBalancerInfo lBalancerInfo = createLoadBalancer(network, environmentName, vpc,
-                                                        inputParameters.getListeningInternalPort(),
-                                                        inputParameters.getListeningInternalPort(),
-                                                        inputParameters.getSslCertificateArn());
-    network.setLoadBalancerSecurityGroup(lBalancerInfo.getSecurityGroup());
-    network.setLoadBalancer(lBalancerInfo.getApplicationLoadBalancer());
-    network.setHttpListener(lBalancerInfo.getHttpListener());
-    network.setHttpsListener(lBalancerInfo.getHttpsListener());
+    var loadBalancerInfo = createLoadBalancer(network, envName, vpc,
+                                              validInParams.getListeningInternalPort(),
+                                              validInParams.getListeningInternalPort(),
+                                              validInParams.getSslCertificateArn());
+    network.setLoadBalancerSecurityGroup(loadBalancerInfo.getSecurityGroup());
+    network.setLoadBalancer(loadBalancerInfo.getApplicationLoadBalancer());
+    network.setHttpListener(loadBalancerInfo.getHttpListener());
+    loadBalancerInfo.getHttpsListener().ifPresent(network::setHttpsListener);
 
     // TODO: Create output parameters
 
-    Tags.of(network).add("environment", environmentName);
+    Tags.of(network).add("environment", envName);
 
     return network;
   }
@@ -88,11 +101,11 @@ public final class Network extends Construct {
 
   private static IVpc vpcFrom(Construct scope, String environmentName, int natGatewayNumber,
                               int maxAZs) {
-    String publicSubnetName = joinedString("-", environmentName, "publicSubnet");
-    SubnetConfiguration publicSubnet = subnetFrom(publicSubnetName, SubnetType.PUBLIC);
+    var publicSubnetName = joinedString("-", environmentName, "publicSubnet");
+    var publicSubnet = subnetFrom(publicSubnetName, SubnetType.PUBLIC);
 
-    String isolatedSubnetName = joinedString("-", environmentName, "isolatedSubnet");
-    SubnetConfiguration privateSubnet = subnetFrom(isolatedSubnetName, SubnetType.ISOLATED);
+    var isolatedSubnetName = joinedString("-", environmentName, "isolatedSubnet");
+    var privateSubnet = subnetFrom(isolatedSubnetName, SubnetType.ISOLATED);
 
     return Vpc.Builder.create(scope, "vpc")
                       .natGateways(natGatewayNumber)
@@ -102,88 +115,79 @@ public final class Network extends Construct {
   }
 
   private static SubnetConfiguration subnetFrom(String name, SubnetType subnetType) {
-    return SubnetConfiguration.builder()
-                              .subnetType(subnetType)
-                              .name(name)
-                              .build();
+    return SubnetConfiguration.builder().subnetType(subnetType).name(name).build();
   }
 
   private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
                                                      IVpc vpc, int internalPort, int externalPort,
-                                                     Optional<String> sslCertificateArn) {
-    String secGroupName = joinedString("-", environmentName, "loadbalancerSecurityGroup");
-    String description = "Public access to the load balancer.";
-    ISecurityGroup lbSecGroup = SecurityGroup.Builder.create(scope, "loadbalancerSecurityGroup")
-                                                     .securityGroupName(secGroupName)
-                                                     .description(description)
-                                                     .vpc(vpc)
-                                                     .build();
+                                                     String sslCertificateArn) {
+    var securityGroupName = joinedString("-", environmentName, "loadbalancerSecurityGroup");
+    var description = "Public access to the load balancer.";
+    var loadBalancerSecurityGroup = SecurityGroup.Builder.create(scope, "loadbalancerSecurityGroup")
+                                                         .securityGroupName(securityGroupName)
+                                                         .description(description)
+                                                         .vpc(vpc)
+                                                         .build();
     CfnSecurityGroupIngress.Builder.create(scope, "ingressToLoadbalancer")
-                                   .groupId(lbSecGroup.getSecurityGroupId())
-                                   .cidrIp("0.0.0.0/0")
-                                   .ipProtocol("-1")
+                                   .groupId(loadBalancerSecurityGroup.getSecurityGroupId())
+                                   .cidrIp(ALL_IP_RANGES_CIDR)
+                                   .ipProtocol(ALL_IP_PROTOCOLS)
                                    .build();
 
-    String loadbalancerName = joinedString("-", environmentName, "loadbalancer");
-    IApplicationLoadBalancer loadBalancer
-        = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
-                                         .loadBalancerName(loadbalancerName)
-                                         .vpc(vpc)
-                                         .internetFacing(true)
-                                         .securityGroup(lbSecGroup)
-                                         .build();
+    var loadbalancerName = joinedString("-", environmentName, "loadbalancer");
+    var loadBalancer = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
+                                                      .loadBalancerName(loadbalancerName)
+                                                      .vpc(vpc)
+                                                      .internetFacing(true)
+                                                      .securityGroup(loadBalancerSecurityGroup)
+                                                      .build();
 
-    String targetGroupName = joinedString("-", environmentName, "no-op-targetGroup");
-    IApplicationTargetGroup targetGroup
-        = ApplicationTargetGroup.Builder.create(scope, "targetGroup")
-                                        .vpc(vpc)
-                                        .port(internalPort)
-                                        .protocol(ApplicationProtocol.HTTP)
-                                        .targetGroupName(targetGroupName)
-                                        .targetType(TargetType.IP)
-                                        .build();
-
-    BaseApplicationListenerProps httpListenerProps
-        = BaseApplicationListenerProps.builder()
-                                      .port(externalPort)
+    var targetGroupName = joinedString("-", environmentName, "no-op-targetGroup");
+    var targetGroup = singletonList(
+        ApplicationTargetGroup.Builder.create(scope, "targetGroup")
+                                      .vpc(vpc)
+                                      .port(internalPort)
                                       .protocol(ApplicationProtocol.HTTP)
-                                      .open(true)
-                                      .build();
-    AddApplicationTargetGroupsProps appTargetGroupProps
-        = AddApplicationTargetGroupsProps.builder()
-                                         .targetGroups(singletonList(targetGroup))
-                                         .build();
-    IApplicationListener httpListener = loadBalancer.addListener("httpListener",
-                                                                 httpListenerProps);
+                                      .targetGroupName(targetGroupName)
+                                      .targetType(TargetType.IP)
+                                      .build()
+                                   );
+
+    var httpListenerProps = BaseApplicationListenerProps.builder()
+                                                        .port(externalPort)
+                                                        .protocol(ApplicationProtocol.HTTP)
+                                                        .open(true)
+                                                        .build();
+    var appTargetGroupProps = AddApplicationTargetGroupsProps.builder()
+                                                             .targetGroups(targetGroup)
+                                                             .build();
+    var httpListener = loadBalancer.addListener("httpListener", httpListenerProps);
     httpListener.addTargetGroups("http", appTargetGroupProps);
 
-    Optional<IApplicationListener> optionalHttpsListener = Optional.empty();
-    if (sslCertificateArn.isPresent()) {
-      IListenerCertificate certificate = ListenerCertificate.fromArn(sslCertificateArn.get());
-      BaseApplicationListenerProps httpsListenerProps
+    IApplicationListener httpsListener = null;
+    if (sslCertificateArn != null) {
+      var certificate = ListenerCertificate.fromArn(sslCertificateArn);
+      var httpsListenerProps
           = BaseApplicationListenerProps.builder()
                                         .port(443)
                                         .protocol(ApplicationProtocol.HTTPS)
                                         .certificates(singletonList(certificate))
                                         .open(true)
                                         .build();
-      IApplicationListener httpsListener = loadBalancer.addListener("httpsListener",
-                                                                    httpsListenerProps);
-      AddApplicationTargetGroupsProps appsTargetGroupProps
-          = AddApplicationTargetGroupsProps.builder()
-                                           .targetGroups(singletonList(targetGroup))
-                                           .build();
+      httpsListener = loadBalancer.addListener("httpsListener", httpsListenerProps);
+      var appsTargetGroupProps = AddApplicationTargetGroupsProps.builder()
+                                                                .targetGroups(targetGroup)
+                                                                .build();
       httpsListener.addTargetGroups("https", appsTargetGroupProps);
-
-      optionalHttpsListener = Optional.of(httpsListener);
     }
 
-    return new LoadBalancerInfo(lbSecGroup, loadBalancer, httpListener, optionalHttpsListener);
+    return new LoadBalancerInfo(loadBalancerSecurityGroup, loadBalancer, httpListener,
+                                httpsListener);
   }
 
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
-    private Optional<String> sslCertificateArn;
+    private final String sslCertificateArn;
 
     @Setter(AccessLevel.PACKAGE)
     private int natGatewayNumber = 0;
@@ -198,11 +202,11 @@ public final class Network extends Construct {
     private int listeningExternalPort = 80;
 
     InputParameters() {
-      this.sslCertificateArn = Optional.empty();
+      this.sslCertificateArn = null;
     }
 
     InputParameters(String sslCertificateArn) {
-      this.sslCertificateArn = Optional.of(sslCertificateArn);
+      this.sslCertificateArn = sslCertificateArn;
     }
   }
 
@@ -212,6 +216,11 @@ public final class Network extends Construct {
     private final ISecurityGroup securityGroup;
     private final IApplicationLoadBalancer applicationLoadBalancer;
     private final IApplicationListener httpListener;
-    private final Optional<IApplicationListener> httpsListener;
+    @Getter(AccessLevel.NONE)
+    private final IApplicationListener httpsListener;
+
+    private Optional<IApplicationListener> getHttpsListener() {
+      return Optional.ofNullable(httpsListener);
+    }
   }
 }
