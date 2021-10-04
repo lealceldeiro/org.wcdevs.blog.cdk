@@ -8,6 +8,7 @@ import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
+import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.SecurityGroup;
 import software.amazon.awscdk.services.ec2.SubnetConfiguration;
@@ -24,20 +25,37 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationListen
 import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCertificate;
 import software.amazon.awscdk.services.elasticloadbalancingv2.TargetType;
+import software.amazon.awscdk.services.ssm.StringParameter;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 
 @Setter(AccessLevel.PRIVATE)
+@Getter(AccessLevel.PRIVATE)
 public final class Network extends Construct {
   private static final String CLUSTER_NAME = "ecsCluster";
+
   private static final String ALL_IP_PROTOCOLS = "-1";
   // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
   private static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
+
+  private static final String PARAM_VPC_ID = "vpcId";
+  private static final String PARAM_HTTP_LISTENER_ARN = "httpListenerArn";
+  private static final String PARAM_HTTPS_LISTENER_ARN = "httpsListenerArn";
+  private static final String PARAM_LOAD_BALANCER_SECURITY_GROUP_ID = "lBSecGroupId";
+  private static final String PARAM_LOAD_BALANCER_ARN = "lBArn";
+  private static final String PARAM_LOAD_BALANCER_DNS_NAME = "lBDnsName";
+  private static final String PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID = "lBCanHostedZoneId";
+  private static final String PARAM_CLUSTER_NAME = "clusterName";
+  private static final String PARAM_AVAILABILITY_ZONE = "availabilityZn";
+  private static final String PARAM_ISOLATED_SUBNET = "isolatedSubNetId";
+  private static final String PARAM_PUBLIC_SUBNET = "publicSubNetId";
 
   private String environmentName;
   private IVpc vpc;
@@ -88,7 +106,7 @@ public final class Network extends Construct {
     network.setHttpListener(loadBalancerInfo.getHttpListener());
     loadBalancerInfo.getHttpsListener().ifPresent(network::setHttpsListener);
 
-    // TODO: Create output parameters
+    saveNetworkInfoToParameterStore(network);
 
     Tags.of(network).add("environment", envName);
 
@@ -185,12 +203,64 @@ public final class Network extends Construct {
                                 httpsListener);
   }
 
+  private static void saveNetworkInfoToParameterStore(Network network) {
+    createStringParameter(network, PARAM_VPC_ID, network.getVpc().getVpcId());
+    createStringParameter(network, PARAM_CLUSTER_NAME, network.getEcsCluster().getClusterName());
+    createStringParameter(network, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID,
+                          network.getLoadBalancerSecurityGroup().getSecurityGroupId());
+    createStringParameter(network, PARAM_LOAD_BALANCER_ARN,
+                          network.getLoadBalancer().getLoadBalancerArn());
+    createStringParameter(network, PARAM_LOAD_BALANCER_DNS_NAME,
+                          network.getLoadBalancer().getLoadBalancerDnsName());
+    createStringParameter(network, PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID,
+                          network.getLoadBalancer().getLoadBalancerCanonicalHostedZoneId());
+    createStringParameter(network, PARAM_HTTP_LISTENER_ARN,
+                          network.getHttpListener().getListenerArn());
+
+    var httpsListenerArn = network.getHttpsListener() != null
+                           ? network.getHttpsListener().getListenerArn()
+                           : "null";
+    createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
+
+    createStringListParameter(network, PARAM_AVAILABILITY_ZONE,
+                              network.getVpc().getAvailabilityZones(),
+                              Function.identity());
+
+    createStringListParameter(network, PARAM_ISOLATED_SUBNET,
+                              network.getVpc().getIsolatedSubnets(),
+                              ISubnet::getSubnetId);
+
+    createStringListParameter(network, PARAM_PUBLIC_SUBNET,
+                              network.getVpc().getPublicSubnets(),
+                              ISubnet::getSubnetId);
+  }
+
+  private static void createStringParameter(Network network, String id, String stringValue) {
+    StringParameter.Builder.create(network, id)
+                           .parameterName(parameterName(network.getEnvironmentName(), id))
+                           .stringValue(stringValue)
+                           .build();
+  }
+
+  private static <T> void createStringListParameter(Network network, String id,
+                                                    List<? extends T> values,
+                                                    Function<T, String> mapper) {
+    // StringListParameter is currently broken: https://github.com/aws/aws-cdk/issues/3586
+    for (var i = 0; i < values.size(); i++) {
+      createStringParameter(network, joinedString("-", id, i), mapper.apply(values.get(i)));
+    }
+  }
+
+  private static String parameterName(String environmentName, String parameterName) {
+    return environmentName + "-Network-" + parameterName;
+  }
+
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
     private final String sslCertificateArn;
 
     @Setter(AccessLevel.PACKAGE)
-    private int natGatewayNumber = 0;
+    private int natGatewayNumber;
 
     @Setter(AccessLevel.PACKAGE)
     private int maxAZs = 2;
