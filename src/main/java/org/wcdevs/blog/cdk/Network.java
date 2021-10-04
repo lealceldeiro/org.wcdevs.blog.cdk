@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -53,9 +55,9 @@ public final class Network extends Construct {
   private static final String PARAM_LOAD_BALANCER_DNS_NAME = "lBDnsName";
   private static final String PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID = "lBCanHostedZoneId";
   private static final String PARAM_CLUSTER_NAME = "clusterName";
-  private static final String PARAM_AVAILABILITY_ZONE = "availabilityZn";
-  private static final String PARAM_ISOLATED_SUBNET = "isolatedSubNetId";
-  private static final String PARAM_PUBLIC_SUBNET = "publicSubNetId";
+  private static final String PARAM_AVAILABILITY_ZONES = "availabilityZn";
+  private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNetId";
+  private static final String PARAM_PUBLIC_SUBNETS = "publicSubNetId";
 
   private String environmentName;
   private IVpc vpc;
@@ -222,15 +224,15 @@ public final class Network extends Construct {
                            : "null";
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
 
-    createStringListParameter(network, PARAM_AVAILABILITY_ZONE,
+    createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
                               network.getVpc().getAvailabilityZones(),
                               Function.identity());
 
-    createStringListParameter(network, PARAM_ISOLATED_SUBNET,
+    createStringListParameter(network, PARAM_ISOLATED_SUBNETS,
                               network.getVpc().getIsolatedSubnets(),
                               ISubnet::getSubnetId);
 
-    createStringListParameter(network, PARAM_PUBLIC_SUBNET,
+    createStringListParameter(network, PARAM_PUBLIC_SUBNETS,
                               network.getVpc().getPublicSubnets(),
                               ISubnet::getSubnetId);
   }
@@ -247,13 +249,77 @@ public final class Network extends Construct {
                                                     Function<T, String> mapper) {
     // StringListParameter is currently broken: https://github.com/aws/aws-cdk/issues/3586
     for (var i = 0; i < values.size(); i++) {
-      createStringParameter(network, joinedString("-", id, i), mapper.apply(values.get(i)));
+      createStringParameter(network, idForParameterListItem(id, i), mapper.apply(values.get(i)));
     }
+  }
+
+  private static String idForParameterListItem(String id, int elementIndex) {
+    return joinedString("-", id, elementIndex);
   }
 
   private static String parameterName(String environmentName, String parameterName) {
     return environmentName + "-Network-" + parameterName;
   }
+
+  // region parameters store getters
+  public static String getParameter(Network network, String id) {
+    var parameterName = parameterName(network.getEnvironmentName(), id);
+    return StringParameter.fromStringParameterName(network, id, parameterName).getStringValue();
+  }
+
+  public static String getVPCId(Network network) {
+    return getParameter(network, PARAM_VPC_ID);
+  }
+
+  public static String getClusterName(Network network) {
+    return getParameter(network, PARAM_CLUSTER_NAME);
+  }
+
+  public static String getLoadBalancerSecurityGroupId(Network network) {
+    return getParameter(network, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID);
+  }
+
+  public static String getLoadBalancerArn(Network network) {
+    return getParameter(network, PARAM_LOAD_BALANCER_ARN);
+  }
+
+  public static String getLoadBalancerDnsName(Network network) {
+    return getParameter(network, PARAM_LOAD_BALANCER_DNS_NAME);
+  }
+
+  public static String getLoadBalancerCanonicalHostedZoneId(Network network) {
+    return getParameter(network, PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID);
+  }
+
+  public static String getHttpListenerArn(Network network) {
+    return getParameter(network, PARAM_HTTP_LISTENER_ARN);
+  }
+
+  public static String getHttpsListenerArn(Network network) {
+    return getParameter(network, PARAM_HTTPS_LISTENER_ARN);
+  }
+
+  public static List<String> getParameterList(Network network, String id, int totalElements) {
+    return IntStream.range(0, totalElements)
+                    .mapToObj(i -> getParameter(network, idForParameterListItem(id, i)))
+                    .collect(Collectors.toList());
+  }
+
+  public static List<String> getAvailabilityZones(Network network) {
+    return getParameterList(network, PARAM_AVAILABILITY_ZONES,
+                            network.getVpc().getAvailabilityZones().size());
+  }
+
+  public static List<String> getIsolatedSubnets(Network network) {
+    return getParameterList(network, PARAM_ISOLATED_SUBNETS,
+                            network.getVpc().getIsolatedSubnets().size());
+  }
+
+  public static List<String> getPublicSubnets(Network network) {
+    return getParameterList(network, PARAM_PUBLIC_SUBNETS,
+                            network.getVpc().getIsolatedSubnets().size());
+  }
+  // endregion
 
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
