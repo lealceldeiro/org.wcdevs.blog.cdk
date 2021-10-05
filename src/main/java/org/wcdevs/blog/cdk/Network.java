@@ -302,7 +302,7 @@ public final class Network extends Construct {
   public static List<String> getParameterList(Network network, String id, int totalElements) {
     return IntStream.range(0, totalElements)
                     .mapToObj(i -> getParameter(network, idForParameterListItem(id, i)))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toUnmodifiableList());
   }
 
   public static List<String> getAvailabilityZones(Network network) {
