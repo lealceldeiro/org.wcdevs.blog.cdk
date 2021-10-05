@@ -321,6 +321,14 @@ public final class Network extends Construct {
   }
   // endregion
 
+  public static InputParameters newInputParameters() {
+    return new InputParameters();
+  }
+
+  public static InputParameters newInputParameters(String sslCertificate) {
+    return new InputParameters(sslCertificate);
+  }
+
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
     private final String sslCertificateArn;
