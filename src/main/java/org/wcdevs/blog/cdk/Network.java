@@ -6,14 +6,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
-import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.SecurityGroup;
-import software.amazon.awscdk.services.ec2.SubnetConfiguration;
-import software.amazon.awscdk.services.ec2.SubnetType;
-import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ICluster;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
@@ -34,12 +30,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 
 @Setter(AccessLevel.PRIVATE)
-@Getter(AccessLevel.PRIVATE)
+@Getter(AccessLevel.PACKAGE)
 public final class Network extends Construct {
   private static final String CLUSTER_NAME = "ecsCluster";
 
@@ -121,21 +116,10 @@ public final class Network extends Construct {
 
   private static IVpc vpcFrom(Construct scope, String environmentName, int natGatewayNumber,
                               int maxAZs) {
-    var publicSubnetName = joinedString("-", environmentName, "publicSubnet");
-    var publicSubnet = subnetFrom(publicSubnetName, SubnetType.PUBLIC);
-
-    var isolatedSubnetName = joinedString("-", environmentName, "isolatedSubnet");
-    var privateSubnet = subnetFrom(isolatedSubnetName, SubnetType.ISOLATED);
-
-    return Vpc.Builder.create(scope, "vpc")
-                      .natGateways(natGatewayNumber)
-                      .maxAzs(maxAZs)
-                      .subnetConfiguration(asList(publicSubnet, privateSubnet))
-                      .build();
-  }
-
-  private static SubnetConfiguration subnetFrom(String name, SubnetType subnetType) {
-    return SubnetConfiguration.builder().subnetType(subnetType).name(name).build();
+    return NetworkUtil.vpcFrom(scope,
+                               joinedString("-", environmentName, "isolatedSubnet"),
+                               joinedString("-", environmentName, "publicSubnet"),
+                               natGatewayNumber, maxAZs);
   }
 
   private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
@@ -148,11 +132,8 @@ public final class Network extends Construct {
                                                          .description(description)
                                                          .vpc(vpc)
                                                          .build();
-    CfnSecurityGroupIngress.Builder.create(scope, "ingressToLoadbalancer")
-                                   .groupId(loadBalancerSecurityGroup.getSecurityGroupId())
-                                   .cidrIp(ALL_IP_RANGES_CIDR)
-                                   .ipProtocol(ALL_IP_PROTOCOLS)
-                                   .build();
+    NetworkUtil.cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId(),
+                                            ALL_IP_RANGES_CIDR, ALL_IP_PROTOCOLS);
 
     var loadbalancerName = joinedString("-", environmentName, "loadbalancer");
     var loadBalancer = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
@@ -330,19 +311,13 @@ public final class Network extends Construct {
   }
 
   @Getter(AccessLevel.PACKAGE)
+  @Setter(AccessLevel.PACKAGE)
   public static final class InputParameters {
     private final String sslCertificateArn;
 
-    @Setter(AccessLevel.PACKAGE)
     private int natGatewayNumber;
-
-    @Setter(AccessLevel.PACKAGE)
     private int maxAZs = 2;
-
-    @Setter(AccessLevel.PACKAGE)
     private int listeningInternalPort = 8080;
-
-    @Setter(AccessLevel.PACKAGE)
     private int listeningExternalPort = 80;
 
     InputParameters() {
