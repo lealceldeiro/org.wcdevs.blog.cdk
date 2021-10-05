@@ -1,5 +1,6 @@
 module org.wcdevs.blog.cdk {
-  requires lombok;
+  requires constructs;
+  requires static lombok;
   requires core;
   requires ecr;
   requires iam;
