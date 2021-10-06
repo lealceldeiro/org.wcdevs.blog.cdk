@@ -302,14 +302,29 @@ public final class Network extends Construct {
   }
   // endregion
 
+  /**
+   * Creates a new {@link InputParameters}.
+   *
+   * @return The newly created {@link InputParameters}.
+   */
   public static InputParameters newInputParameters() {
     return new InputParameters();
   }
 
+  /**
+   * Creates a new {@link InputParameters} from a given ssl certificate.
+   *
+   * @param sslCertificate SSL Certificate.
+   *
+   * @return The newly created {@link InputParameters}.
+   */
   public static InputParameters newInputParameters(String sslCertificate) {
     return new InputParameters(sslCertificate);
   }
 
+  /**
+   * Holds the input parameters to build a new {@link Network}.
+   */
   @Getter(AccessLevel.PACKAGE)
   @Setter(AccessLevel.PACKAGE)
   public static final class InputParameters {
