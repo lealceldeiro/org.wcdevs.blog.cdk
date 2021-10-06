@@ -1,16 +1,19 @@
 package org.wcdevs.blog.cdk;
 
-import java.security.SecureRandom;
-import java.util.Random;
-import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import software.amazon.awscdk.core.Construct;
+import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.services.ecr.Repository;
+import software.amazon.awscdk.services.ecr.TagMutability;
 import software.amazon.awscdk.services.iam.Grant;
 import software.amazon.jsii.JsiiEngine;
+
+import java.security.SecureRandom;
+import java.util.Random;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -35,7 +38,16 @@ class DockerRepositoryTest {
   }
 
   @Test
-  void newInstance() {
+  void newInstanceWithDefaults() {
+    testNewInstanceWithParameters(RemovalPolicy.RETAIN, TagMutability.IMMUTABLE);
+  }
+
+  @Test
+  void newInstanceWithCustomInputParameters() {
+    testNewInstanceWithParameters(RemovalPolicy.DESTROY, TagMutability.MUTABLE);
+  }
+
+  void testNewInstanceWithParameters(RemovalPolicy removalPolicy, TagMutability tagMutable) {
     try (
         MockedStatic<JsiiEngine> mockedJsiiEngine = mockStatic(JsiiEngine.class);
         MockedStatic<Repository.Builder> mockedBuilder = mockStatic(Repository.Builder.class)
@@ -43,9 +55,11 @@ class DockerRepositoryTest {
       mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(mock(JsiiEngine.class));
       mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
 
+      DockerRepository.InputParameters inParameters = mock(DockerRepository.InputParameters.class);
+      when(inParameters.removalPolicy()).thenReturn(removalPolicy);
+      when(inParameters.tagMutability()).thenReturn(tagMutable);
       DockerRepository actual
-          = DockerRepository.newInstance(mock(Construct.class), randomString(),
-                                         mock(DockerRepository.InputParameters.class));
+          = DockerRepository.newInstance(mock(Construct.class), randomString(), inParameters);
       Assertions.assertNotNull(actual);
     }
   }

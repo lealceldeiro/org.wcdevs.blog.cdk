@@ -43,29 +43,31 @@ public final class DockerRepository extends Construct {
   /**
    * Creates a new {@link DockerRepository}.
    *
-   * @param scopeArg Scope in which the ECR will be defined.
-   * @param idArg    Scoped id of the ECR.
+   * @param scope           Scope in which the ECR will be defined.
+   * @param id              Scoped id of the ECR.
+   * @param inputParameters Input parameters to build the new {@link DockerRepository}.
+   *
+   * @return The newly created {@link DockerRepository}.
    */
-  public static DockerRepository newInstance(Construct scopeArg, String idArg,
+  public static DockerRepository newInstance(Construct scope, String id,
                                              InputParameters inputParameters) {
-    Construct scope = Objects.requireNonNull(scopeArg);
-    String id = Objects.requireNonNull(idArg);
-    InputParameters inParameters = Objects.requireNonNull(inputParameters);
+    var validScope = Objects.requireNonNull(scope);
+    var validId = Objects.requireNonNull(id);
+    var validInParams = Objects.requireNonNull(inputParameters);
 
-    DockerRepository dockerRepository = new DockerRepository(scope, id);
-    LifecycleRule lifecycleRule = LifecycleRule.builder()
-                                               .rulePriority(LCR_PRIORITY)
-                                               .description(descriptionFrom(inParameters))
-                                               .maxImageCount(inParameters.getMaxImageCount())
-                                               .build();
-    Repository ecRepository = Repository.Builder.create(dockerRepository,
-                                                        string("ecRepository", id))
-                                                .imageTagMutability(inParameters.tagMutability())
-                                                .repositoryName(inParameters.getRepositoryName())
-                                                .removalPolicy(inParameters.removalPolicy())
-                                                .lifecycleRules(singletonList(lifecycleRule))
-                                                .build();
-    ecRepository.grantPullPush(new AccountPrincipal(inParameters.getAccountId()));
+    var dockerRepository = new DockerRepository(validScope, validId);
+    var lifecycleRule = LifecycleRule.builder()
+                                     .rulePriority(LCR_PRIORITY)
+                                     .description(descriptionFrom(validInParams))
+                                     .maxImageCount(validInParams.getMaxImageCount())
+                                     .build();
+    var ecRepository = Repository.Builder.create(dockerRepository, string("ecRepository", validId))
+                                         .imageTagMutability(validInParams.tagMutability())
+                                         .repositoryName(validInParams.getRepositoryName())
+                                         .removalPolicy(validInParams.removalPolicy())
+                                         .lifecycleRules(singletonList(lifecycleRule))
+                                         .build();
+    ecRepository.grantPullPush(new AccountPrincipal(validInParams.getAccountId()));
 
     dockerRepository.setEcRepository(ecRepository);
 
@@ -73,17 +75,38 @@ public final class DockerRepository extends Construct {
   }
 
   private static String descriptionFrom(InputParameters inParameter) {
-    String description = "Docker ECR '%s' will hold a maximum of %s images. It will %s retained on "
-                         + "deletion and tags are %s";
+    var description = "Docker ECR '%s' will hold a maximum of %s images. It will %s retained on "
+                      + "deletion and tags are %s";
     return format(description, inParameter.getRepositoryName(), inParameter.getMaxImageCount(),
                   (inParameter.isRetainRegistryOnDelete() ? "be" : "not be"),
                   (inParameter.isInmutableTags() ? "inmutables" : "mutables"));
   }
 
+  /**
+   * Creates a new {@link InputParameters} from a given repository name and an account id.
+   *
+   * @param repositoryName Repository name.
+   * @param accountId      Account id.
+   *
+   * @return The newly created {@link InputParameters}.
+   */
   public static InputParameters newInputParameters(String repositoryName, String accountId) {
     return new InputParameters(repositoryName, accountId);
   }
 
+  /**
+   * Creates a new {@link InputParameters} from a given arguments.
+   *
+   * @param repositoryName         Repository name.
+   * @param accountId              Account id.
+   * @param maxImageCount          Max number of images to keep in the repository.
+   * @param retainRegistryOnDelete Whether to retain the registry on repository delete or not.
+   *                               {@code true}: keep, {@code false}: delete.
+   * @param inmutableTags          Whether image tags should be inmutable or not.
+   *                               {@code true}: inmutable, {@code false}: mutable.
+   *
+   * @return The newly created {@link InputParameters}.
+   */
   public static InputParameters newInputParameters(String repositoryName, String accountId,
                                                    int maxImageCount,
                                                    boolean retainRegistryOnDelete,
@@ -98,7 +121,7 @@ public final class DockerRepository extends Construct {
   @Getter(AccessLevel.PACKAGE)
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-  public static class InputParameters {
+  public static final class InputParameters {
     static final int DEFAULT_MAX_IMAGE_COUNT = 10;
     static final boolean DEFAULT_RETAIN_POLICY = true;
     static final boolean DEFAULT_INMUTABLE_TAGS = true;

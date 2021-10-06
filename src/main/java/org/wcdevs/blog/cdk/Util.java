@@ -13,4 +13,11 @@ final class Util {
                  .map(Object::toString)
                  .collect(Collectors.joining());
   }
+
+  static String joinedString(CharSequence joiner, Object... values) {
+    return Arrays.stream(values)
+                 .filter(Objects::nonNull)
+                 .map(Object::toString)
+                 .collect(Collectors.joining(joiner));
+  }
 }
