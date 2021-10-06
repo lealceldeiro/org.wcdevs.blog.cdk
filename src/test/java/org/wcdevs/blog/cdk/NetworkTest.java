@@ -14,8 +14,10 @@ import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 import software.amazon.jsii.JsiiEngine;
 
+import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -31,6 +33,9 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 class NetworkTest {
+  private static final Random RANDOM = new SecureRandom();
+  private static final int RANDOM_UPPER_BOUND = 9000;
+
   private static String randomString() {
     return UUID.randomUUID().toString();
   }
@@ -286,5 +291,96 @@ class NetworkTest {
 
     assertNotNull(actual);
     assertEquals(certificate, actual.getSslCertificateArn());
+  }
+
+  @Test
+  void testSetNatGatewayNumber() {
+    var natNumber = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
+
+    var inputParameters = Network.newInputParameters();
+    inputParameters.setNatGatewayNumber(natNumber);
+
+    assertEquals(natNumber, ReflectionUtil.<Integer>getField(inputParameters, "natGatewayNumber"));
+  }
+
+  @Test
+  void testSetMaxAZs() {
+    var maxAZs = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
+
+    var inputParameters = Network.newInputParameters();
+    inputParameters.setMaxAZs(maxAZs);
+
+    assertEquals(maxAZs, ReflectionUtil.<Integer>getField(inputParameters, "maxAZs"));
+  }
+
+  @Test
+  void testSetListeningInternalPort() {
+    var listeningInternalPort = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
+
+    var inputParameters = Network.newInputParameters();
+    inputParameters.setListeningInternalPort(listeningInternalPort);
+
+    assertEquals(listeningInternalPort,
+                 ReflectionUtil.<Integer>getField(inputParameters, "listeningInternalPort"));
+  }
+
+  @Test
+  void testSetListeningExternalPort() {
+    var listeningExternalPort = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
+
+    var inputParameters = Network.newInputParameters();
+    inputParameters.setListeningExternalPort(listeningExternalPort);
+
+    assertEquals(listeningExternalPort,
+                 ReflectionUtil.<Integer>getField(inputParameters, "listeningExternalPort"));
+  }
+
+  @Test
+  void testGetNatGatewayNumber() {
+    var natGatewayNumber = RANDOM.nextInt();
+
+    var inputParameters = Network.newInputParameters();
+    ReflectionUtil.setField(inputParameters, "natGatewayNumber", natGatewayNumber);
+
+    assertEquals(natGatewayNumber, inputParameters.getNatGatewayNumber());
+  }
+
+  @Test
+  void testGetMaxAZs() {
+    var maxAZs = RANDOM.nextInt();
+
+    var inputParameters = Network.newInputParameters();
+    ReflectionUtil.setField(inputParameters, "maxAZs", maxAZs);
+
+    assertEquals(maxAZs, inputParameters.getMaxAZs());
+  }
+
+  @Test
+  void testGetListeningInternalPort() {
+    var listeningInternalPort = RANDOM.nextInt();
+
+    var inputParameters = Network.newInputParameters();
+    ReflectionUtil.setField(inputParameters, "listeningInternalPort", listeningInternalPort);
+
+    assertEquals(listeningInternalPort, inputParameters.getListeningInternalPort());
+  }
+
+  @Test
+  void testGetListeningExternalPort() {
+    var listeningExternalPort = RANDOM.nextInt();
+
+    var inputParameters = Network.newInputParameters();
+    ReflectionUtil.setField(inputParameters, "listeningExternalPort", listeningExternalPort);
+
+    assertEquals(listeningExternalPort, inputParameters.getListeningExternalPort());
+  }
+
+  @Test
+  void testGetSslCertificateArn() {
+    var sslCertificateArn = randomString();
+
+    var inputParameters = Network.newInputParameters(sslCertificateArn);
+
+    assertEquals(sslCertificateArn, inputParameters.getSslCertificateArn());
   }
 }
