@@ -1,6 +1,7 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.ISubnet;
@@ -26,6 +27,8 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -398,5 +401,62 @@ class NetworkTest {
     var inputParameters = Network.newInputParameters(sslCertificateArn);
 
     assertEquals(sslCertificateArn, inputParameters.getSslCertificateArn());
+  }
+
+  @Test
+  void outputParametersFromReturnsOKWithDefaults() {
+    var stringParamMock = mock(IStringParameter.class);
+    String expected = randomString();
+    when(stringParamMock.getStringValue()).thenReturn(expected);
+
+    try (var mockedStringParameter = mockStatic(StringParameter.class)) {
+      mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
+                           .thenReturn(stringParamMock);
+      Network.OutputParameters output = Network.outputParametersFrom(mock(Construct.class),
+                                                                     randomString());
+      assertNotNull(output);
+      assertEquals(expected, output.getVpcId());
+      assertEquals(expected, output.getHttpListenerArn());
+      assertEquals(expected, output.getHttpsListenerArn().orElseThrow());
+      assertEquals(expected, output.getLoadbalancerSecurityGroupId());
+      assertEquals(expected, output.getEcsClusterName());
+      assertEquals(expected, output.getLoadBalancerArn());
+      assertEquals(expected, output.getLoadBalancerDnsName());
+      assertEquals(expected, output.getLoadBalancerCanonicalHostedZoneId());
+      assertTrue(output.getAvailabilityZones().contains(expected));
+      assertTrue(output.getIsolatedSubnets().contains(expected));
+      assertTrue(output.getPublicSubnets().contains(expected));
+      assertEquals(Network.DEFAULT_NUMBER_OF_AZ, output.getAvailabilityZones().size());
+      assertEquals(Network.DEFAULT_NUMBER_OF_AZ * Network.DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ,
+                   output.getIsolatedSubnets().size());
+      assertEquals(Network.DEFAULT_NUMBER_OF_AZ * Network.DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ,
+                   output.getPublicSubnets().size());
+    }
+  }
+
+  @Test
+  void outputParametersFromThrowsWithIllegalNumberOfIsolatedSubnetsPerAz() {
+    testOutputParametersFromThrowsWithIllegalArgs(0, 1, 1);
+  }
+
+  @Test
+  void outputParametersFromThrowsWithIllegalNumberOfPublicSubnetsPerAz() {
+    testOutputParametersFromThrowsWithIllegalArgs(1, 0, 1);
+  }
+
+  @Test
+  void outputParametersFromThrowsWithIllegalTotalAvailabilityZones() {
+    testOutputParametersFromThrowsWithIllegalArgs(1, 1, 0);
+  }
+
+  void testOutputParametersFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAz,
+                                                     int numberOfPublicSubnetsPerAz,
+                                                     int totalAvailabilityZones) {
+    Executable executable = () -> Network.outputParametersFrom(mock(Construct.class),
+                                                               randomString(),
+                                                               numberOfIsolatedSubnetsPerAz,
+                                                               numberOfPublicSubnetsPerAz,
+                                                               totalAvailabilityZones);
+    assertThrows(IllegalArgumentException.class, executable);
   }
 }
