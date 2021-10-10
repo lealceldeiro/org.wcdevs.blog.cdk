@@ -16,12 +16,13 @@ final class NetworkUtil {
   private NetworkUtil() {
   }
 
-  static IVpc vpcFrom(Construct scope,
-                      int numberOfIsolatedSubnetsPerAZ, int numberOfPublicSubnetsPerAZ,
-                      String isolatedSubnetsNamePrefix, String publicSubnetsNamePrefix,
-                      int natGatewayNumber, int maxAZs) {
-    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1) {
-      throw new IllegalArgumentException("The number of private and public subnets must be >= 1");
+  static IVpc vpcFrom(Construct scope, int numberOfIsolatedSubnetsPerAZ,
+                      int numberOfPublicSubnetsPerAZ, String isolatedSubnetsNamePrefix,
+                      String publicSubnetsNamePrefix, int natGatewayNumber, int maxAZs) {
+    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || natGatewayNumber < 1
+        || maxAZs < 1) {
+      String err = "The number of private/public subnets, AZs and natGatewayNumber must be >= 1";
+      throw new IllegalArgumentException(err);
     }
 
     var isolatedSubnets = subnetsStreamFrom(numberOfIsolatedSubnetsPerAZ, isolatedSubnetsNamePrefix,
