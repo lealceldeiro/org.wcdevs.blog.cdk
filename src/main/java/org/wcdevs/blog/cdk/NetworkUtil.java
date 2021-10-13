@@ -48,6 +48,7 @@ final class NetworkUtil {
 
   static CfnSecurityGroupIngress cfnSecurityGroupIngressFrom(Construct scope, String lBSecyGroupId,
                                                              String cidrIp, String ipProtocol) {
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
     return CfnSecurityGroupIngress.Builder.create(scope, "ingressToLoadbalancer")
                                           .groupId(lBSecyGroupId).cidrIp(cidrIp)
                                           .ipProtocol(ipProtocol).build();
