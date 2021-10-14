@@ -53,10 +53,6 @@ public final class Network extends Construct {
   // region private constants
   private static final String CLUSTER_NAME = "ecsCluster";
 
-  private static final String ALL_IP_PROTOCOLS = "-1";
-  // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
-  private static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
-
   private static final String PARAM_VPC_ID = "vpcId";
   private static final String PARAM_HTTP_LISTENER_ARN = "httpListenerArn";
   private static final String PARAM_HTTPS_LISTENER_ARN = "httpsListenerArn";
@@ -83,6 +79,10 @@ public final class Network extends Construct {
   // endregion
 
   // region public constants
+  // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+  public static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
+  public static final String ALL_IP_PROTOCOLS = "-1";
+
   /**
    * Number of isolated subnets that will be available for each AZ by default.
    */
@@ -95,6 +95,10 @@ public final class Network extends Construct {
    * Number of AZ by default.
    */
   public static final int DEFAULT_NUMBER_OF_AZ = 2;
+  /**
+   * Represents there's no https listener arn.
+   */
+  public static final String NULL_HTTPS_LISTENER_ARN_VALUE = "null";
   // endregion
 
   private Network(Construct scope, String id) {
@@ -241,7 +245,7 @@ public final class Network extends Construct {
 
     var httpsListenerArn = network.getHttpsListener() != null
                            ? network.getHttpsListener().getListenerArn()
-                           : "null";
+                           : NULL_HTTPS_LISTENER_ARN_VALUE;
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
 
     createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
