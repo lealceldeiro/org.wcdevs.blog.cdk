@@ -68,13 +68,26 @@ import static java.util.Collections.emptyList;
  */
 public final class AECService extends Construct {
   private static final String AWS_SERVICE_ECS_TASKS_AMAZON_COM = "ecs-tasks.amazon.com";
+
   private static final String NETWORK_MODE_AWS_VPC = "awsvpc";
   private static final String LUNCH_TYPE_FARGATE = "FARGATE";
+
+  private static final String TARGET_TYPE_IP = "ip";
+  private static final String TARGET_TYPE_INSTANCE = "instance";
+  private static final String TARGET_TYPE_LAMBDA = "lambda";
+  private static final String TARGET_TYPE_ALB = "alb";
 
   public static final String LOG_DRIVER_AWS_LOGS = "awslogs";
   public static final String LOG_DRIVER_SPLUNK = "splunk";
   public static final String LOG_DRIVER_AWS_FIRE_LENS = "awsfirelens";
+
   private static final String ASSIGN_PUBLIC_IP_ENABLED = "ENABLED";
+
+  private static final String STICKY_SESSIONS_ENABLED = "stickiness.enabled";
+  private static final String STICKY_SESSIONS_TYPE = "stickiness.type";
+  private static final String STICKY_SESSIONS_LB_COOKIE_DURATION = "stickiness.lb_cookie.duration_seconds";
+  private static final String STICKY_SESSIONS_TYPE_LB_COOKIE = "lb_cookie";
+  private static final String STRING_TRUE = "true";
 
   private AECService(Construct scope, String id) {
     super(scope, id);
@@ -91,36 +104,36 @@ public final class AECService extends Construct {
     var netOutputParameters = Objects.requireNonNull(networkOutputParameters);
     var appEnv = Objects.requireNonNull(applicationEnvironment);
 
-    var service = new AECService(validScope, validId);
+    var aECService = new AECService(validScope, validId);
 
-    var targetGroup = targetGroup(service, inParameters, netOutputParameters);
-    var serviceHttpListenerRules = httpListenerRules(service, targetGroup, netOutputParameters);
+    var targetGroup = targetGroup(aECService, inParameters, netOutputParameters);
+    var serviceHttpListenerRules = httpListenerRules(aECService, targetGroup, netOutputParameters);
 
-    var logGroup = LogGroup.Builder.create(service, "ecsLogGroup")
+    var logGroup = LogGroup.Builder.create(aECService, "ecsLogGroup")
                                    .logGroupName(applicationEnvironment.prefixed("logs"))
                                    .retention(inParameters.getLogRetention())
                                    .removalPolicy(RemovalPolicy.DESTROY)
                                    .build();
 
-    var ecsTaskExecutionRole = ecsTaskExecutionRole(service, appEnv);
-    var ecsTaskRole = ecsTaskRole(service, appEnv, inParameters);
+    var ecsTaskExecutionRole = ecsTaskExecutionRole(aECService, appEnv);
+    var ecsTaskRole = ecsTaskRole(aECService, appEnv, inParameters);
 
-    var dockerImageUrl = dockerImageRepositoryUrl(service, inParameters, ecsTaskExecutionRole);
+    var dockerImageUrl = dockerImageRepositoryUrl(aECService, inParameters, ecsTaskExecutionRole);
 
     var containerDefProperty = containerDefinitionProperty(awsEnv, logGroup, appEnv, inParameters,
                                                            dockerImageUrl);
 
-    var taskDefinition = taskDefinition(service, inParameters, ecsTaskExecutionRole, ecsTaskRole,
+    var taskDefinition = taskDefinition(aECService, inParameters, ecsTaskExecutionRole, ecsTaskRole,
                                         containerDefProperty);
 
-    var ecsSecurityGroup = ecsSecurityGroup(service, inParameters, netOutputParameters);
+    var ecsSecurityGroup = ecsSecurityGroup(aECService, inParameters, netOutputParameters);
 
-    var ecsService = cfnService(service, taskDefinition, targetGroup, ecsSecurityGroup, appEnv,
+    var cfnService = cfnService(aECService, taskDefinition, targetGroup, ecsSecurityGroup, appEnv,
                                 inParameters, netOutputParameters);
     // https://stackoverflow.com/q/61250772/5640649
-    ecsService.addDependsOn(serviceHttpListenerRules.getHttpRule());
+    cfnService.addDependsOn(serviceHttpListenerRules.getHttpRule());
 
-    return service;
+    return aECService;
   }
 
   // region helpers
@@ -135,12 +148,36 @@ public final class AECService extends Construct {
                                  .healthCheckTimeoutSeconds(params.getHealthCheckTimeoutSeconds())
                                  .healthyThresholdCount(params.getHealthyThresholdCount())
                                  .unhealthyThresholdCount(params.getUnhealthyThresholdCount())
-                                 .targetGroupAttributes(emptyList())
-                                 .targetType("ip")
+                                 .targetGroupAttributes(stickySessionsConf(params))
+                                 .targetType(TARGET_TYPE_IP)
                                  .port(params.getContainerPort())
                                  .protocol(params.getContainerProtocol())
                                  .vpcId(netOutputParameters.getVpcId())
                                  .build();
+  }
+
+  private static List<CfnTargetGroup.TargetGroupAttributeProperty> stickySessionsConf(InputParameters params) {
+    var cookieDuration = String.valueOf(params.getStickySessionsCookieDuration());
+
+    // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/sticky-sessions.html
+    // https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html
+    return !params.isStickySessionsEnabled()
+           ? emptyList()
+           : List.of(CfnTargetGroup.TargetGroupAttributeProperty
+                         .builder()
+                         .key(STICKY_SESSIONS_ENABLED)
+                         .value(STRING_TRUE)
+                         .build(),
+                     CfnTargetGroup.TargetGroupAttributeProperty
+                         .builder()
+                         .key(STICKY_SESSIONS_TYPE)
+                         .value(STICKY_SESSIONS_TYPE_LB_COOKIE)
+                         .build(),
+                     CfnTargetGroup.TargetGroupAttributeProperty
+                         .builder()
+                         .key(STICKY_SESSIONS_LB_COOKIE_DURATION)
+                         .value(cookieDuration)
+                         .build());
   }
 
   private static ServiceListenerRules httpListenerRules(Construct scope, CfnTargetGroup targetGroup,
@@ -205,11 +242,11 @@ public final class AECService extends Construct {
   }
 
   private static Role ecsTaskRole(Construct scope, ApplicationEnvironment appEnv,
-                                  AECService.InputParameters inputParameters) {
+                                  AECService.InputParameters params) {
     var iamPrincipal = ServicePrincipal.Builder.create(AWS_SERVICE_ECS_TASKS_AMAZON_COM).build();
     var roleBuilder = Role.Builder.create(scope, "ecsTaskRole").assumedBy(iamPrincipal).path("/");
 
-    var taskRolePolicyStatements = inputParameters.getTaskRolePolicyStatements();
+    var taskRolePolicyStatements = params.getTaskRolePolicyStatements();
     if (taskRolePolicyStatements != null && !taskRolePolicyStatements.isEmpty()) {
       var policyDocument = PolicyDocument.Builder.create()
                                                  .statements(taskRolePolicyStatements)
@@ -220,9 +257,9 @@ public final class AECService extends Construct {
     return roleBuilder.build();
   }
 
-  private static String dockerImageRepositoryUrl(Construct scope, InputParameters inParameters,
+  private static String dockerImageRepositoryUrl(Construct scope, InputParameters params,
                                                  IGrantable ecsTaskExecutionRole) {
-    var dockerImage = Objects.requireNonNull(inParameters.getDockerImage());
+    var dockerImage = Objects.requireNonNull(params.getDockerImage());
     if (dockerImage.isEcrSource()) {
       var dockerRepository = Repository.fromRepositoryName(scope, "ecrRepository",
                                                            dockerImage.getDockerRepositoryName());
@@ -235,25 +272,25 @@ public final class AECService extends Construct {
   private static CfnTaskDefinition.ContainerDefinitionProperty containerDefinitionProperty(Environment awsEnv,
                                                                                            LogGroup logGroup,
                                                                                            ApplicationEnvironment appEnv,
-                                                                                           InputParameters inParameters,
+                                                                                           InputParameters params,
                                                                                            String dockerImageRepositoryUrl) {
     var logConfOptions = Map.of("awslogs-group", logGroup.getLogGroupName(),
                                 "awslogs-region", Objects.requireNonNull(awsEnv.getRegion()),
                                 "awslogs-stream-prefix", appEnv.prefixed("stream"),
-                                "awslogs-datetime-format", inParameters.getAwsLogsDateTimeFormat());
+                                "awslogs-datetime-format", params.getAwsLogsDateTimeFormat());
     var logConf = CfnTaskDefinition.LogConfigurationProperty.builder()
                                                             .logDriver(LOG_DRIVER_AWS_LOGS)
                                                             .options(logConfOptions)
                                                             .build();
     var portMapping = CfnTaskDefinition.PortMappingProperty.builder()
-                                                           .containerPort(inParameters.getContainerPort());
-    var environmentVars = cfnTaskDefKeyValuePropertiesFrom(inParameters.getEnvironmentVariables());
+                                                           .containerPort(params.getContainerPort());
+    var environmentVars = cfnTaskDefKeyValuePropertiesFrom(params.getEnvironmentVariables());
 
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
     return CfnTaskDefinition.ContainerDefinitionProperty.builder()
                                                         .name(containerName(appEnv))
-                                                        .cpu(inParameters.getCpu())
-                                                        .memory(inParameters.getMemory())
+                                                        .cpu(params.getCpu())
+                                                        .memory(params.getMemory())
                                                         .image(dockerImageRepositoryUrl)
                                                         .logConfiguration(logConf)
                                                         .portMappings(List.of(portMapping))
@@ -278,13 +315,13 @@ public final class AECService extends Construct {
                                                  .build();
   }
 
-  private static CfnTaskDefinition taskDefinition(Construct scope, InputParameters inParameters,
+  private static CfnTaskDefinition taskDefinition(Construct scope, InputParameters params,
                                                   IRole ecsTaskExecutionRole,
                                                   Role ecsTaskRole,
                                                   CfnTaskDefinition.ContainerDefinitionProperty containerDef) {
     return CfnTaskDefinition.Builder.create(scope, "taskDefinition")
-                                    .cpu(String.valueOf(inParameters.getCpu()))
-                                    .memory(String.valueOf(inParameters.getMemory()))
+                                    .cpu(String.valueOf(params.getCpu()))
+                                    .memory(String.valueOf(params.getMemory()))
                                     .networkMode(NETWORK_MODE_AWS_VPC)
                                     // https://docs.aws.amazon.com/AmazonECS/latest/userguide/fargate-task-defs.html
                                     .requiresCompatibilities(List.of(LUNCH_TYPE_FARGATE))
@@ -294,7 +331,7 @@ public final class AECService extends Construct {
                                     .build();
   }
 
-  private static CfnSecurityGroup ecsSecurityGroup(Construct scope, InputParameters inParameters,
+  private static CfnSecurityGroup ecsSecurityGroup(Construct scope, InputParameters params,
                                                    Network.OutputParameters netOutputParameters) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
     var secGroup = CfnSecurityGroup.Builder.create(scope, "ecsSecurityGroup")
@@ -315,7 +352,7 @@ public final class AECService extends Construct {
                                    .groupId(secGroup.getAttrGroupId())
                                    .build();
     allowIngressFromEcsToSecurityGroupIds(scope, secGroup.getAttrGroupId(),
-                                          inParameters.getSecurityGroupIdsToGrantIngressFromEcs());
+                                          params.getSecurityGroupIdsToGrantIngressFromEcs());
     return secGroup;
   }
 
@@ -334,16 +371,16 @@ public final class AECService extends Construct {
 
   private static CfnService cfnService(Construct scope, CfnTaskDefinition taskDefinition,
                                        CfnTargetGroup targetGroup, CfnSecurityGroup securityGroup,
-                                       ApplicationEnvironment appEnv, InputParameters inParameters,
+                                       ApplicationEnvironment appEnv, InputParameters params,
                                        Network.OutputParameters netOutputParameters) {
     var deployConf = CfnService.DeploymentConfigurationProperty
         .builder()
-        .maximumPercent(inParameters.getMaximumInstancesPercent())
-        .minimumHealthyPercent(inParameters.getMinimumHealthyInstancesPercent())
+        .maximumPercent(params.getMaximumInstancesPercent())
+        .minimumHealthyPercent(params.getMinimumHealthyInstancesPercent())
         .build();
     var loadBalancerConf = CfnService.LoadBalancerProperty.builder()
                                                           .containerName(containerName(appEnv))
-                                                          .containerPort(inParameters.getContainerPort())
+                                                          .containerPort(params.getContainerPort())
                                                           .targetGroupArn(targetGroup.getRef())
                                                           .build();
     var vpcConf = CfnService.AwsVpcConfigurationProperty.builder()
@@ -360,7 +397,7 @@ public final class AECService extends Construct {
                              .cluster(netOutputParameters.getEcsClusterName())
                              .launchType(LUNCH_TYPE_FARGATE)
                              .deploymentConfiguration(deployConf)
-                             .desiredCount(inParameters.getDesiredInstancesCount())
+                             .desiredCount(params.getDesiredInstancesCount())
                              .taskDefinition(taskDefinition.getRef())
                              .loadBalancers(List.of(loadBalancerConf))
                              .networkConfiguration(netProps)
@@ -407,6 +444,7 @@ public final class AECService extends Construct {
     private int maximumInstancesPercent = 200;
     private int minimumHealthyInstancesPercent = 50;
     private boolean stickySessionsEnabled = false;
+    private int stickySessionsCookieDuration = 3600;
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
   }
 
