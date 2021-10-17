@@ -89,6 +89,16 @@ public final class AECService extends Construct {
   private static final String STICKY_SESSIONS_TYPE_LB_COOKIE = "lb_cookie";
   private static final String STRING_TRUE = "true";
 
+  private static final String LISTENER_RULE_ACTION_TYPE_FORWARD = "forward";
+  private static final String LISTENER_RULE_ACTION_TYPE_FIXED_RESPONSE = "fixed-response";
+  private static final String LISTENER_RULE_ACTION_TYPE_REDIRECT = "redirect";
+  private static final String LISTENER_RULE_CONDITION_PATH_PATTERN = "path-pattern";
+  private static final String LISTENER_RULE_CONDITION_HTTP_REQ_METHOD = "http-request-method";
+  private static final String LISTENER_RULE_CONDITION_HOST_HEADER = "host-header";
+  private static final String LISTENER_RULE_CONDITION_SOURCE_IP = "source-ip";
+  private static final int HTTP_LISTENER_RULE_FORWARD_PATH_PRIORITY = 3;
+  private static final int HTTPS_LISTENER_RULE_FORWARD_PATH_PRIORITY = 5;
+
   private AECService(Construct scope, String id) {
     super(scope, id);
   }
@@ -185,10 +195,10 @@ public final class AECService extends Construct {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listenerrule.html
     var actionProperty = CfnListenerRule.ActionProperty.builder()
                                                        .targetGroupArn(targetGroup.getRef())
-                                                       .type("forward")
+                                                       .type(LISTENER_RULE_ACTION_TYPE_FORWARD)
                                                        .build();
     var conditionProperty = CfnListenerRule.RuleConditionProperty.builder()
-                                                                 .field("path-pattern")
+                                                                 .field(LISTENER_RULE_CONDITION_PATH_PATTERN)
                                                                  .values(List.of("*"))
                                                                  .build();
     var nullValue = Network.NULL_HTTPS_LISTENER_ARN_VALUE;
@@ -204,7 +214,7 @@ public final class AECService extends Construct {
                                                    .actions(List.of(actionProperty))
                                                    .conditions(List.of(conditionProperty))
                                                    .listenerArn(httpsListenerArn)
-                                                   .priority(1)
+                                                   .priority(HTTP_LISTENER_RULE_FORWARD_PATH_PRIORITY)
                                                    .build();
     httpsListenerRule.getCfnOptions().setCondition(httpsListenerArnExists);
 
@@ -214,7 +224,7 @@ public final class AECService extends Construct {
                                                   .listenerArn(
                                                       netOutputParams.getHttpListenerArn()
                                                               )
-                                                  .priority(2)
+                                                  .priority(HTTPS_LISTENER_RULE_FORWARD_PATH_PRIORITY)
                                                   .build();
 
     return new ServiceListenerRules(httpsListenerRule, httpListenerRule);
@@ -261,12 +271,13 @@ public final class AECService extends Construct {
                                                  IGrantable ecsTaskExecutionRole) {
     var dockerImage = Objects.requireNonNull(params.getDockerImage());
     if (dockerImage.isEcrSource()) {
+      var dockerRepositoryName = Objects.requireNonNull(dockerImage.getDockerRepositoryName());
       var dockerRepository = Repository.fromRepositoryName(scope, "ecrRepository",
-                                                           dockerImage.getDockerRepositoryName());
+                                                           dockerRepositoryName);
       dockerRepository.grantPullPush(ecsTaskExecutionRole);
       return dockerRepository.repositoryUriForTag(dockerImage.getDockerImageTag());
     }
-    return dockerImage.getDockerImageUrl();
+    return Objects.requireNonNull(dockerImage.getDockerImageUrl());
   }
 
   private static CfnTaskDefinition.ContainerDefinitionProperty containerDefinitionProperty(Environment awsEnv,
@@ -283,7 +294,8 @@ public final class AECService extends Construct {
                                                             .options(logConfOptions)
                                                             .build();
     var portMapping = CfnTaskDefinition.PortMappingProperty.builder()
-                                                           .containerPort(params.getContainerPort());
+                                                           .containerPort(params.getContainerPort())
+                                                           .build();
     var environmentVars = cfnTaskDefKeyValuePropertiesFrom(params.getEnvironmentVariables());
 
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
@@ -357,10 +369,10 @@ public final class AECService extends Construct {
   }
 
   private static void allowIngressFromEcsToSecurityGroupIds(Construct scope, String ecsSecGroupId,
-                                                            Collection<String> secGroupsToGrantedIngressFromEcs) {
+                                                            Collection<String> secGroupsToGrantIngressFromEcs) {
     IntFunction<String> idFn = counter -> String.format("securityGroupIngress%s", counter);
     AtomicInteger counter = new AtomicInteger(1);
-    Optional.ofNullable(secGroupsToGrantedIngressFromEcs)
+    Optional.ofNullable(secGroupsToGrantIngressFromEcs)
             .orElse(emptyList())
             .forEach(id -> CfnSecurityGroupIngress.Builder.create(scope, idFn.apply(counter.getAndIncrement()))
                                                           .sourceSecurityGroupId(ecsSecGroupId)
@@ -422,7 +434,7 @@ public final class AECService extends Construct {
   }
 
   @Getter(AccessLevel.PACKAGE)
-  @RequiredArgsConstructor
+  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
   @Setter
   public static final class InputParameters {
     private final DockerImage dockerImage;
@@ -448,7 +460,7 @@ public final class AECService extends Construct {
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
   }
 
-  @RequiredArgsConstructor
+  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
   @Getter(AccessLevel.PACKAGE)
   public static class DockerImage {
     /**
@@ -464,7 +476,7 @@ public final class AECService extends Construct {
   }
 
   @Getter(AccessLevel.PACKAGE)
-  @RequiredArgsConstructor
+  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
   private static class ServiceListenerRules {
     private final CfnListenerRule httpsRule;
     private final CfnListenerRule httpRule;
