@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Assertions;
 
 import java.lang.reflect.Field;
 
-final class ReflectionUtil {
-  private ReflectionUtil() {
+final class TestsReflectionUtil {
+  private TestsReflectionUtil() {
   }
 
   @SuppressWarnings("unchecked")

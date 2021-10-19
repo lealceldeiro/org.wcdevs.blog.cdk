@@ -7,10 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.SecurityGroup;
+import software.amazon.awscdk.services.ec2.SubnetConfiguration;
+import software.amazon.awscdk.services.ec2.SubnetType;
+import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ICluster;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
@@ -30,8 +34,10 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 
 /**
@@ -159,10 +165,36 @@ public final class Network extends Construct {
   private static IVpc vpcFrom(Construct scope, String environmentName, int natGatewayNumber,
                               int numberOfIsolatedSubnetsPerAZ, int numberOfPublicSubnetsPerAZ,
                               int maxAZs) {
-    return NetworkUtil.vpcFrom(scope, numberOfIsolatedSubnetsPerAZ, numberOfPublicSubnetsPerAZ,
-                               joinedString(DASH_JOINER, environmentName, "isolatedSubnet"),
-                               joinedString(DASH_JOINER, environmentName, "publicSubnet"),
-                               natGatewayNumber, maxAZs);
+    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || natGatewayNumber < 1
+        || maxAZs < 1) {
+      String err = "The number of private/public subnets, AZs and natGatewayNumber must be >= 1";
+      throw new IllegalArgumentException(err);
+    }
+
+    var isolatedSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, "isolatedSubnet");
+    var isolatedSubnets = subnetsStreamFrom(numberOfIsolatedSubnetsPerAZ, isolatedSubnetsNamePrefix,
+                                            SubnetType.ISOLATED);
+    var publicSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, "publicSubnet");
+    var publicSubnets = subnetsStreamFrom(numberOfPublicSubnetsPerAZ, publicSubnetsNamePrefix,
+                                          SubnetType.PUBLIC);
+    var subnetConfig = Stream.concat(isolatedSubnets, publicSubnets).collect(toList());
+
+    return Vpc.Builder.create(scope, "vpc")
+                      .natGateways(natGatewayNumber)
+                      .maxAzs(maxAZs)
+                      .subnetConfiguration(subnetConfig)
+                      .build();
+  }
+
+  private static Stream<SubnetConfiguration> subnetsStreamFrom(int numberOfIsolatedSubnets,
+                                                               String subnetsNamePrefix,
+                                                               SubnetType subnetType) {
+    return IntStream.range(0, numberOfIsolatedSubnets)
+                    .mapToObj(i -> subnetFrom(subnetsNamePrefix + i, subnetType));
+  }
+
+  private static SubnetConfiguration subnetFrom(String name, SubnetType subnetType) {
+    return SubnetConfiguration.builder().subnetType(subnetType).name(name).build();
   }
 
   private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
@@ -175,8 +207,7 @@ public final class Network extends Construct {
                                                          .description(description)
                                                          .vpc(vpc)
                                                          .build();
-    NetworkUtil.cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId(),
-                                            ALL_IP_RANGES_CIDR, ALL_IP_PROTOCOLS);
+    cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId());
 
     var loadbalancerName = joinedString(DASH_JOINER, environmentName, "loadbalancer");
     var loadBalancer = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
@@ -227,6 +258,16 @@ public final class Network extends Construct {
 
     return new LoadBalancerInfo(loadBalancerSecurityGroup, loadBalancer, httpListener,
                                 httpsListener);
+  }
+
+  private static CfnSecurityGroupIngress cfnSecurityGroupIngressFrom(Construct scope,
+                                                                     String lBSecyGroupId) {
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+    return CfnSecurityGroupIngress.Builder.create(scope, "ingressToLoadbalancer")
+                                          .groupId(lBSecyGroupId)
+                                          .cidrIp(ALL_IP_RANGES_CIDR)
+                                          .ipProtocol(ALL_IP_PROTOCOLS)
+                                          .build();
   }
 
   private static void saveNetworkInfoToParameterStore(Network network) {

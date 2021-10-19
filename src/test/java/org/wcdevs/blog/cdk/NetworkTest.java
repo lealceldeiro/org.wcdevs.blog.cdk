@@ -1,5 +1,6 @@
 package org.wcdevs.blog.cdk;
 
+import com.fasterxml.jackson.databind.node.TextNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import software.amazon.awscdk.core.Construct;
@@ -7,13 +8,17 @@ import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.SecurityGroup;
+import software.amazon.awscdk.services.ec2.SubnetConfiguration;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCertificate;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
+import software.amazon.jsii.JsiiClient;
 import software.amazon.jsii.JsiiEngine;
+import software.amazon.jsii.JsiiObjectMapper;
+import software.amazon.jsii.Kernel;
 
 import java.security.SecureRandom;
 import java.util.Collections;
@@ -31,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -57,23 +61,32 @@ class NetworkTest {
 
   @Test
   void newInstanceWithCertificate() {
-    testNewInstance(randomString());
+    testNewInstance(randomString(), 1, 1, 1, 1);
   }
 
   @Test
   void newInstanceWithoutCertificate() {
-    testNewInstance(null);
+    testNewInstance(null, 1, 1, 1, 1);
   }
 
-  void testNewInstance(String sslCertificateArg) {
+  void testNewInstance(String sslCertificateArg, int numberOfIsolatedSubnetsPerAZ,
+                       int numberOfPublicSubnetsPerAZ, int natGatewayNumber, int maxAZs) {
     var subnets = Collections.singletonList(mock(ISubnet.class));
     when(subnets.get(0).getSubnetId()).thenReturn(randomString());
 
-    IVpc vpcMock = mock(IVpc.class);
+    var vpcMock = mock(IVpc.class);
     when(vpcMock.getVpcId()).thenReturn(randomString());
     when(vpcMock.getAvailabilityZones()).thenReturn(Collections.singletonList(randomString()));
     when(vpcMock.getIsolatedSubnets()).thenReturn(subnets);
     when(vpcMock.getPublicSubnets()).thenReturn(subnets);
+
+    var subnetConfigurationBuilderMock = mock(SubnetConfiguration.Builder.class);
+    when(subnetConfigurationBuilderMock.subnetType(any()))
+        .thenReturn(subnetConfigurationBuilderMock);
+    when(subnetConfigurationBuilderMock.name(any()))
+        .thenReturn(subnetConfigurationBuilderMock);
+    when(subnetConfigurationBuilderMock.build())
+        .thenReturn(mock(SubnetConfiguration.class));
 
     var clusterMock = mock(Cluster.class);
     when(clusterMock.getClusterName()).thenReturn(randomString());
@@ -83,10 +96,10 @@ class NetworkTest {
     when(clusterBuilderMock.clusterName(any())).thenReturn(clusterBuilderMock);
     when(clusterBuilderMock.build()).thenReturn(clusterMock);
 
-    SecurityGroup secGroupMock = mock(SecurityGroup.class);
+    var secGroupMock = mock(SecurityGroup.class);
     when(secGroupMock.getSecurityGroupId()).thenReturn(randomString());
 
-    SecurityGroup.Builder secGroupBuilderMock = mock(SecurityGroup.Builder.class);
+    var secGroupBuilderMock = mock(SecurityGroup.Builder.class);
     when(secGroupBuilderMock.securityGroupName(any())).thenReturn(secGroupBuilderMock);
     when(secGroupBuilderMock.description(any())).thenReturn(secGroupBuilderMock);
     when(secGroupBuilderMock.vpc(any())).thenReturn(secGroupBuilderMock);
@@ -121,43 +134,41 @@ class NetworkTest {
     doNothing().when(tagsMock).add(any(), any());
 
     try (
+        var mockedKernel = mockStatic(Kernel.class);
         var mockedJsiiEngine = mockStatic(JsiiEngine.class);
-        var mockedVpcUtil = mockStatic(NetworkUtil.class);
-        var mockedClusterBuilder = mockStatic(Cluster.Builder.class);
-        var mockedSecGroupBuilder = mockStatic(SecurityGroup.Builder.class);
-        var mockedApplicationLoadBalancer = mockStatic(ApplicationLoadBalancer.Builder.class);
+        var mockedJsiiObjectMapper = mockStatic(JsiiObjectMapper.class);
         var mockedStringParameterBuilder = mockStatic(StringParameter.Builder.class);
+        var mockedApplicationLoadBalancer = mockStatic(ApplicationLoadBalancer.Builder.class);
         var mockedTags = mockStatic(Tags.class);
         var mockedListenerCertificate = mockStatic(ListenerCertificate.class)
     ) {
-      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(mock(JsiiEngine.class));
+      mockedKernel.when(() -> Kernel.get(any(), any(), any())).then(TestsUtil::kernelAnswer);
 
-      mockedVpcUtil.when(() -> NetworkUtil.vpcFrom(any(), anyInt(), anyInt(), any(), any(),
-                                                   anyInt(), anyInt()))
-                   .thenReturn(vpcMock);
-      mockedVpcUtil.when(() -> NetworkUtil.cfnSecurityGroupIngressFrom(any(), any(), any(), any()))
-                   .thenReturn(null);
+      var jsiiClientMock = mock(JsiiClient.class);
+      when(jsiiClientMock.getStaticPropertyValue(any(), any()))
+          .thenReturn(new TextNode("mockData"));
+      var jsiiEngineMock = mock(JsiiEngine.class);
+      when(jsiiEngineMock.getClient()).thenReturn(jsiiClientMock);
+      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(jsiiEngineMock);
 
-      mockedClusterBuilder.when(() -> Cluster.Builder.create(any(), any()))
-                          .thenReturn(clusterBuilderMock);
-
-      mockedApplicationLoadBalancer.when(() -> ApplicationLoadBalancer.Builder.create(any(), any()))
-                                   .thenReturn(appLoadBalancerBuilderMock);
-
-      mockedSecGroupBuilder.when(() -> SecurityGroup.Builder.create(any(), any()))
-                           .thenReturn(secGroupBuilderMock);
-
-      mockedListenerCertificate.when(() -> ListenerCertificate.fromArn(any()))
-                               .thenReturn(sslCertificateMock);
-
+      mockedJsiiObjectMapper.when(() -> JsiiObjectMapper.treeToValue(any(), any()))
+                            .then(TestsUtil::jsiiObjectMapperAnswer);
       mockedStringParameterBuilder.when(() -> StringParameter.Builder.create(any(), any()))
                                   .thenReturn(stringParameterBuilder);
-
+      mockedApplicationLoadBalancer.when(() -> ApplicationLoadBalancer.Builder.create(any(), any()))
+                                   .thenReturn(appLoadBalancerBuilderMock);
+      mockedListenerCertificate.when(() -> ListenerCertificate.fromArn(any()))
+                               .thenReturn(sslCertificateMock);
       mockedTags.when(() -> Tags.of(any())).thenReturn(tagsMock);
 
       var scope = mock(Construct.class);
       var inputParameters = mock((Network.InputParameters.class));
       when(inputParameters.getSslCertificateArn()).thenReturn(sslCertificateArg);
+      when(inputParameters.getMaxAZs()).thenReturn(maxAZs);
+      when(inputParameters.getNumberOfIsolatedSubnetsPerAZ())
+          .thenReturn(numberOfIsolatedSubnetsPerAZ);
+      when(inputParameters.getNumberOfPublicSubnetsPerAZ()).thenReturn(numberOfPublicSubnetsPerAZ);
+      when(inputParameters.getNatGatewayNumber()).thenReturn(natGatewayNumber);
 
       Network actual = Network.newInstance(scope, randomString(), randomString(), inputParameters);
       assertNotNull(actual);
@@ -319,7 +330,8 @@ class NetworkTest {
     var inputParameters = Network.newInputParameters();
     inputParameters.setNatGatewayNumber(natNumber);
 
-    assertEquals(natNumber, ReflectionUtil.<Integer>getField(inputParameters, "natGatewayNumber"));
+    assertEquals(natNumber,
+                 TestsReflectionUtil.<Integer>getField(inputParameters, "natGatewayNumber"));
   }
 
   @Test
@@ -329,7 +341,7 @@ class NetworkTest {
     var inputParameters = Network.newInputParameters();
     inputParameters.setMaxAZs(maxAZs);
 
-    assertEquals(maxAZs, ReflectionUtil.<Integer>getField(inputParameters, "maxAZs"));
+    assertEquals(maxAZs, TestsReflectionUtil.<Integer>getField(inputParameters, "maxAZs"));
   }
 
   @Test
@@ -340,7 +352,7 @@ class NetworkTest {
     inputParameters.setListeningInternalPort(listeningInternalPort);
 
     assertEquals(listeningInternalPort,
-                 ReflectionUtil.<Integer>getField(inputParameters, "listeningInternalPort"));
+                 TestsReflectionUtil.<Integer>getField(inputParameters, "listeningInternalPort"));
   }
 
   @Test
@@ -351,7 +363,7 @@ class NetworkTest {
     inputParameters.setListeningExternalPort(listeningExternalPort);
 
     assertEquals(listeningExternalPort,
-                 ReflectionUtil.<Integer>getField(inputParameters, "listeningExternalPort"));
+                 TestsReflectionUtil.<Integer>getField(inputParameters, "listeningExternalPort"));
   }
 
   @Test
@@ -359,7 +371,7 @@ class NetworkTest {
     var natGatewayNumber = RANDOM.nextInt();
 
     var inputParameters = Network.newInputParameters();
-    ReflectionUtil.setField(inputParameters, "natGatewayNumber", natGatewayNumber);
+    TestsReflectionUtil.setField(inputParameters, "natGatewayNumber", natGatewayNumber);
 
     assertEquals(natGatewayNumber, inputParameters.getNatGatewayNumber());
   }
@@ -369,7 +381,7 @@ class NetworkTest {
     var maxAZs = RANDOM.nextInt();
 
     var inputParameters = Network.newInputParameters();
-    ReflectionUtil.setField(inputParameters, "maxAZs", maxAZs);
+    TestsReflectionUtil.setField(inputParameters, "maxAZs", maxAZs);
 
     assertEquals(maxAZs, inputParameters.getMaxAZs());
   }
@@ -379,7 +391,7 @@ class NetworkTest {
     var listeningInternalPort = RANDOM.nextInt();
 
     var inputParameters = Network.newInputParameters();
-    ReflectionUtil.setField(inputParameters, "listeningInternalPort", listeningInternalPort);
+    TestsReflectionUtil.setField(inputParameters, "listeningInternalPort", listeningInternalPort);
 
     assertEquals(listeningInternalPort, inputParameters.getListeningInternalPort());
   }
@@ -389,7 +401,7 @@ class NetworkTest {
     var listeningExternalPort = RANDOM.nextInt();
 
     var inputParameters = Network.newInputParameters();
-    ReflectionUtil.setField(inputParameters, "listeningExternalPort", listeningExternalPort);
+    TestsReflectionUtil.setField(inputParameters, "listeningExternalPort", listeningExternalPort);
 
     assertEquals(listeningExternalPort, inputParameters.getListeningExternalPort());
   }
@@ -457,6 +469,36 @@ class NetworkTest {
                                                                numberOfIsolatedSubnetsPerAz,
                                                                numberOfPublicSubnetsPerAz,
                                                                totalAvailabilityZones);
+    assertThrows(IllegalArgumentException.class, executable);
+  }
+
+  @Test
+  void vpcFromWithIllegalNumberOfIsolatedSubnetsPerAZ() {
+    testVpcFromThrowsWithIllegalArgs(0, 1, 1, 1);
+  }
+
+  @Test
+  void vpcFromWithIllegalNumberOfPublicSubnetsPerAZ() {
+    testVpcFromThrowsWithIllegalArgs(1, 0, 1, 1);
+  }
+
+  @Test
+  void vpcFromWithIllegalMaxAZs() {
+    testVpcFromThrowsWithIllegalArgs(1, 1, 1, 0);
+  }
+
+  @Test
+  void vpcFromWithIllegalNatGatewayNumber() {
+    testVpcFromThrowsWithIllegalArgs(1, 1, 0, 1);
+  }
+
+  void testVpcFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAZ,
+                                        int numberOfPublicSubnetsPerAZ,
+                                        int natGatewayNumber,
+                                        int maxAZs) {
+    Executable executable = () -> testNewInstance(randomString(), numberOfIsolatedSubnetsPerAZ,
+                                                  numberOfPublicSubnetsPerAZ, natGatewayNumber,
+                                                  maxAZs);
     assertThrows(IllegalArgumentException.class, executable);
   }
 }
