@@ -17,7 +17,6 @@ import java.util.Objects;
 
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
-import static org.wcdevs.blog.cdk.Util.string;
 
 /**
  * Holds the constructs to deploy an ECR repository.
@@ -28,6 +27,7 @@ public final class DockerRepository extends Construct {
    * that matches is applied to an image.
    */
   private static final int LCR_PRIORITY = 1;
+  static final String DOCKER_EC_REPOSITORY_ID = "ecRepository";
 
   /**
    * ECR Repository.
@@ -52,16 +52,15 @@ public final class DockerRepository extends Construct {
   public static DockerRepository newInstance(Construct scope, String id,
                                              InputParameters inputParameters) {
     var validScope = Objects.requireNonNull(scope);
-    var validId = Objects.requireNonNull(id);
     var validInParams = Objects.requireNonNull(inputParameters);
 
-    var dockerRepository = new DockerRepository(validScope, validId);
+    var dockerRepository = new DockerRepository(validScope, Objects.requireNonNull(id));
     var lifecycleRule = LifecycleRule.builder()
                                      .rulePriority(LCR_PRIORITY)
                                      .description(descriptionFrom(validInParams))
                                      .maxImageCount(validInParams.getMaxImageCount())
                                      .build();
-    var ecRepository = Repository.Builder.create(dockerRepository, string("ecRepository", validId))
+    var ecRepository = Repository.Builder.create(dockerRepository, DOCKER_EC_REPOSITORY_ID)
                                          .imageTagMutability(validInParams.tagMutability())
                                          .repositoryName(validInParams.getRepositoryName())
                                          .removalPolicy(validInParams.removalPolicy())

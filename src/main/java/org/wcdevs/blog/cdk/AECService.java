@@ -86,7 +86,8 @@ public final class AECService extends Construct {
 
   private static final String STICKY_SESSIONS_ENABLED = "stickiness.enabled";
   private static final String STICKY_SESSIONS_TYPE = "stickiness.type";
-  private static final String STICKY_SESSIONS_LB_COOKIE_DURATION = "stickiness.lb_cookie.duration_seconds";
+  private static final String STICKY_SESSIONS_LB_COOKIE_DURATION
+      = "stickiness.lb_cookie.duration_seconds";
   private static final String STICKY_SESSIONS_TYPE_LB_COOKIE = "lb_cookie";
   private static final String STRING_TRUE = "true";
 
@@ -108,14 +109,11 @@ public final class AECService extends Construct {
                                        ApplicationEnvironment applicationEnvironment,
                                        InputParameters inputParameters,
                                        Network.OutputParameters networkOutputParameters) {
-    var validScope = Objects.requireNonNull(scope);
-    var validId = Objects.requireNonNull(id);
-    var awsEnv = Objects.requireNonNull(awsEnvironment);
     var inParameters = Objects.requireNonNull(inputParameters);
     var netOutputParameters = Objects.requireNonNull(networkOutputParameters);
     var appEnv = Objects.requireNonNull(applicationEnvironment);
 
-    var aECService = new AECService(validScope, validId);
+    var aECService = new AECService(Objects.requireNonNull(scope), Objects.requireNonNull(id));
 
     var targetGroup = targetGroup(aECService, inParameters, netOutputParameters);
     var serviceHttpListenerRules = httpListenerRules(aECService, targetGroup, netOutputParameters);
@@ -131,7 +129,8 @@ public final class AECService extends Construct {
 
     var dockerImageUrl = dockerImageRepositoryUrl(aECService, inParameters, ecsTaskExecutionRole);
 
-    var containerDefProperty = containerDefinitionProperty(awsEnv, logGroup, appEnv, inParameters,
+    var containerDefProperty = containerDefinitionProperty(Objects.requireNonNull(awsEnvironment),
+                                                           logGroup, appEnv, inParameters,
                                                            dockerImageUrl);
 
     var taskDefinition = taskDefinition(aECService, inParameters, ecsTaskExecutionRole, ecsTaskRole,
@@ -167,7 +166,9 @@ public final class AECService extends Construct {
                                  .build();
   }
 
-  private static List<CfnTargetGroup.TargetGroupAttributeProperty> stickySessionsConf(InputParameters params) {
+  private static List<CfnTargetGroup.TargetGroupAttributeProperty> stickySessionsConf(
+      InputParameters params
+                                                                                     ) {
     var cookieDuration = String.valueOf(params.getStickySessionsCookieDuration());
 
     // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/sticky-sessions.html
@@ -198,37 +199,37 @@ public final class AECService extends Construct {
                                                        .targetGroupArn(targetGroup.getRef())
                                                        .type(LISTENER_RULE_ACTION_TYPE_FORWARD)
                                                        .build();
-    var conditionProperty = CfnListenerRule.RuleConditionProperty.builder()
-                                                                 .field(LISTENER_RULE_CONDITION_PATH_PATTERN)
-                                                                 .values(List.of("*"))
-                                                                 .build();
+    var conditionProperty
+        = CfnListenerRule.RuleConditionProperty.builder()
+                                               .field(LISTENER_RULE_CONDITION_PATH_PATTERN)
+                                               .values(List.of("*"))
+                                               .build();
     var nullValue = Network.NULL_HTTPS_LISTENER_ARN_VALUE;
-    var httpsListenerArn = netOutputParams.getHttpsListenerArn()
-                                          .orElse(nullValue);
+    var httpsListenerArn = netOutputParams.getHttpsListenerArn().orElse(nullValue);
 
     var httpsListenerIsNotNull = Fn.conditionNot(Fn.conditionEquals(httpsListenerArn, nullValue));
     var httpsListenerArnExists = CfnCondition.Builder.create(scope, "httpsListenerRuleCondition")
                                                      .expression(httpsListenerIsNotNull)
                                                      .build();
 
-    var httpsListenerRule = CfnListenerRule.Builder.create(scope, "httpsListenerRule")
-                                                   .actions(List.of(actionProperty))
-                                                   .conditions(List.of(conditionProperty))
-                                                   .listenerArn(httpsListenerArn)
-                                                   .priority(HTTP_LISTENER_RULE_FORWARD_PATH_PRIORITY)
-                                                   .build();
+    var httpsListenerRule
+        = CfnListenerRule.Builder.create(scope, "httpsListenerRule")
+                                 .actions(List.of(actionProperty))
+                                 .conditions(List.of(conditionProperty))
+                                 .listenerArn(httpsListenerArn)
+                                 .priority(HTTP_LISTENER_RULE_FORWARD_PATH_PRIORITY)
+                                 .build();
     httpsListenerRule.getCfnOptions().setCondition(httpsListenerArnExists);
 
-    var httpListenerRule = CfnListenerRule.Builder.create(scope, "httpListenerRule")
-                                                  .actions(List.of(actionProperty))
-                                                  .conditions(List.of(conditionProperty))
-                                                  .listenerArn(
-                                                      netOutputParams.getHttpListenerArn()
-                                                              )
-                                                  .priority(HTTPS_LISTENER_RULE_FORWARD_PATH_PRIORITY)
-                                                  .build();
+    var httpListenerRule
+        = CfnListenerRule.Builder.create(scope, "httpListenerRule")
+                                 .actions(List.of(actionProperty))
+                                 .conditions(List.of(conditionProperty))
+                                 .listenerArn(netOutputParams.getHttpListenerArn())
+                                 .priority(HTTPS_LISTENER_RULE_FORWARD_PATH_PRIORITY)
+                                 .build();
 
-    return new ServiceListenerRules(httpsListenerRule, httpListenerRule);
+    return new ServiceListenerRules(httpListenerRule, httpsListenerRule);
   }
 
   private static Role ecsTaskExecutionRole(Construct scope, ApplicationEnvironment appEnv) {
@@ -273,19 +274,21 @@ public final class AECService extends Construct {
     var dockerImage = Objects.requireNonNull(params.getDockerImage());
     if (dockerImage.isEcrSource()) {
       var dockerRepositoryName = Objects.requireNonNull(dockerImage.getDockerRepositoryName());
-      var dockerRepository = Repository.fromRepositoryName(scope, "ecrRepository",
+      var dockerRepository = Repository.fromRepositoryName(scope,
+                                                           DockerRepository.DOCKER_EC_REPOSITORY_ID,
                                                            dockerRepositoryName);
       dockerRepository.grantPullPush(ecsTaskExecutionRole);
-      return dockerRepository.repositoryUriForTag(dockerImage.getDockerImageTag());
+
+      var dockerImageTag = Objects.requireNonNull(dockerImage.getDockerImageTag());
+      return dockerRepository.repositoryUriForTag(dockerImageTag);
     }
     return Objects.requireNonNull(dockerImage.getDockerImageUrl());
   }
 
-  private static CfnTaskDefinition.ContainerDefinitionProperty containerDefinitionProperty(Environment awsEnv,
-                                                                                           ILogGroup logGroup,
-                                                                                           ApplicationEnvironment appEnv,
-                                                                                           InputParameters params,
-                                                                                           String dockerImageRepositoryUrl) {
+  private static CfnTaskDefinition.ContainerDefinitionProperty containerDefinitionProperty(
+      Environment awsEnv, ILogGroup logGroup, ApplicationEnvironment appEnv, InputParameters params,
+      String dockerImageRepositoryUrl
+                                                                                          ) {
     var logConfOptions = Map.of("awslogs-group", logGroup.getLogGroupName(),
                                 "awslogs-region", Objects.requireNonNull(awsEnv.getRegion()),
                                 "awslogs-stream-prefix", appEnv.prefixed("stream"),
@@ -315,23 +318,27 @@ public final class AECService extends Construct {
     return appEnv.prefixed("container");
   }
 
-  private static List<CfnTaskDefinition.KeyValuePairProperty> cfnTaskDefKeyValuePropertiesFrom(Map<String, String> source) {
+  private static List<CfnTaskDefinition.KeyValuePairProperty> cfnTaskDefKeyValuePropertiesFrom(
+      Map<String, String> source
+                                                                                              ) {
     return source.entrySet().stream()
                  .map(AECService::cfnTaskDefKeyValuePropertyFrom)
                  .collect(Collectors.toList());
   }
 
-  private static CfnTaskDefinition.KeyValuePairProperty cfnTaskDefKeyValuePropertyFrom(Map.Entry<String, String> entry) {
+  private static CfnTaskDefinition.KeyValuePairProperty cfnTaskDefKeyValuePropertyFrom(
+      Map.Entry<String, String> entry
+                                                                                      ) {
     return CfnTaskDefinition.KeyValuePairProperty.builder()
                                                  .name(entry.getKey())
                                                  .value(entry.getValue())
                                                  .build();
   }
 
-  private static CfnTaskDefinition taskDefinition(Construct scope, InputParameters params,
-                                                  IRole ecsTaskExecutionRole,
-                                                  IRole ecsTaskRole,
-                                                  CfnTaskDefinition.ContainerDefinitionProperty containerDef) {
+  private static CfnTaskDefinition taskDefinition(
+      Construct scope, InputParameters params, IRole ecsTaskExecutionRole, IRole ecsTaskRole,
+      CfnTaskDefinition.ContainerDefinitionProperty containerDef
+                                                 ) {
     return CfnTaskDefinition.Builder.create(scope, "taskDefinition")
                                     .cpu(String.valueOf(params.getCpu()))
                                     .memory(String.valueOf(params.getMemory()))
@@ -359,27 +366,30 @@ public final class AECService extends Construct {
                                    .groupId(secGroup.getAttrGroupId())
                                    .build();
     // allow the load balancer to access the container
-    CfnSecurityGroupIngress.Builder.create(scope, "ecsIngressFromLoadBalancer")
-                                   .ipProtocol(Network.ALL_IP_PROTOCOLS)
-                                   .sourceSecurityGroupId(netOutputParameters.getLoadbalancerSecurityGroupId())
-                                   .groupId(secGroup.getAttrGroupId())
-                                   .build();
+    CfnSecurityGroupIngress.Builder
+        .create(scope, "ecsIngressFromLoadBalancer")
+        .ipProtocol(Network.ALL_IP_PROTOCOLS)
+        .sourceSecurityGroupId(netOutputParameters.getLoadbalancerSecurityGroupId())
+        .groupId(secGroup.getAttrGroupId())
+        .build();
     allowIngressFromEcsToSecurityGroupIds(scope, secGroup.getAttrGroupId(),
                                           params.getSecurityGroupIdsToGrantIngressFromEcs());
     return secGroup;
   }
 
   private static void allowIngressFromEcsToSecurityGroupIds(Construct scope, String ecsSecGroupId,
-                                                            Collection<String> secGroupsToGrantIngressFromEcs) {
+                                                            Collection<String> sGroupsAccFromEcs) {
     IntFunction<String> idFn = counter -> String.format("securityGroupIngress%s", counter);
     AtomicInteger counter = new AtomicInteger(1);
-    Optional.ofNullable(secGroupsToGrantIngressFromEcs)
+    Optional.ofNullable(sGroupsAccFromEcs)
             .orElse(emptyList())
-            .forEach(id -> CfnSecurityGroupIngress.Builder.create(scope, idFn.apply(counter.getAndIncrement()))
-                                                          .sourceSecurityGroupId(ecsSecGroupId)
-                                                          .groupId(id)
-                                                          .ipProtocol(Network.ALL_IP_PROTOCOLS)
-                                                          .build());
+            .forEach(id -> CfnSecurityGroupIngress.Builder
+                         .create(scope, idFn.apply(counter.getAndIncrement()))
+                         .sourceSecurityGroupId(ecsSecGroupId)
+                         .groupId(id)
+                         .ipProtocol(Network.ALL_IP_PROTOCOLS)
+                         .build()
+                    );
   }
 
   private static CfnService cfnService(Construct scope, CfnTaskDefinition taskDefinition,
@@ -396,11 +406,12 @@ public final class AECService extends Construct {
                                                           .containerPort(params.getContainerPort())
                                                           .targetGroupArn(targetGroup.getRef())
                                                           .build();
-    var vpcConf = CfnService.AwsVpcConfigurationProperty.builder()
-                                                        .assignPublicIp(ASSIGN_PUBLIC_IP_ENABLED)
-                                                        .securityGroups(List.of(securityGroup.getAttrGroupId()))
-                                                        .subnets(netOutputParameters.getPublicSubnets())
-                                                        .build();
+    var vpcConf = CfnService.AwsVpcConfigurationProperty
+        .builder()
+        .assignPublicIp(ASSIGN_PUBLIC_IP_ENABLED)
+        .securityGroups(List.of(securityGroup.getAttrGroupId()))
+        .subnets(netOutputParameters.getPublicSubnets())
+        .build();
     var netProps = CfnService.NetworkConfigurationProperty.builder()
                                                           .awsvpcConfiguration(vpcConf)
                                                           .build();
