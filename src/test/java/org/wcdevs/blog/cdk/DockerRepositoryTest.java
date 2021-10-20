@@ -15,12 +15,15 @@ import java.security.SecureRandom;
 import java.util.Random;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 class DockerRepositoryTest {
+  private final Random random = new SecureRandom();
+
   private Repository.Builder builderMock;
   private Repository repositoryMock;
 
@@ -94,7 +97,59 @@ class DockerRepositoryTest {
       DockerRepository actual
           = DockerRepository.newInstance(mock(Construct.class), randomString(),
                                          mock(DockerRepository.InputParameters.class));
-      Assertions.assertEquals(repositoryMock, actual.getEcRepository());
+      assertEquals(repositoryMock, actual.getEcRepository());
     }
+  }
+
+  @Test
+  void requiredConstructor() {
+    String repositoryName = randomString();
+    String accountId = randomString();
+    DockerRepository.InputParameters actual = new DockerRepository.InputParameters(repositoryName,
+                                                                                   accountId);
+    Assertions.assertNotNull(actual);
+    assertEquals(repositoryName, actual.getRepositoryName());
+    assertEquals(accountId, actual.getAccountId());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_MAX_IMAGE_COUNT,
+                 actual.getMaxImageCount());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_RETAIN_POLICY,
+                 actual.isRetainRegistryOnDelete());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_INMUTABLE_TAGS,
+                 actual.isInmutableTags());
+    assertEquals(TagMutability.IMMUTABLE, actual.tagMutability());
+    assertEquals(RemovalPolicy.RETAIN, actual.removalPolicy());
+  }
+
+  @Test
+  void allArgsConstructorRetainImageInmutableTags() {
+    testAllArgsConstructor(random.nextInt(),
+                           true, RemovalPolicy.RETAIN,
+                           true, TagMutability.IMMUTABLE);
+  }
+
+  @Test
+  void allArgsConstructorDestroyImageMutableTags() {
+    testAllArgsConstructor(random.nextInt(),
+                           false, RemovalPolicy.DESTROY,
+                           false, TagMutability.MUTABLE);
+  }
+
+  void testAllArgsConstructor(int expectedMaxImageCount, boolean expectedRetainRegistry,
+                              RemovalPolicy expectedRemovalPolicy, boolean expectedInmutableTags,
+                              TagMutability expectedTagMutability) {
+    String repositoryName = randomString();
+    String accountId = randomString();
+
+    DockerRepository.InputParameters actual
+        = new DockerRepository.InputParameters(repositoryName, accountId, expectedMaxImageCount,
+                                               expectedRetainRegistry, expectedInmutableTags);
+    Assertions.assertNotNull(actual);
+    assertEquals(repositoryName, actual.getRepositoryName());
+    assertEquals(accountId, actual.getAccountId());
+    assertEquals(expectedMaxImageCount, actual.getMaxImageCount());
+    assertEquals(expectedRetainRegistry, actual.isRetainRegistryOnDelete());
+    assertEquals(expectedInmutableTags, actual.isInmutableTags());
+    assertEquals(expectedTagMutability, actual.tagMutability());
+    assertEquals(expectedRemovalPolicy, actual.removalPolicy());
   }
 }

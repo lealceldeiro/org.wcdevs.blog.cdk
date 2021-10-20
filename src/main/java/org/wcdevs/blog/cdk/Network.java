@@ -1,15 +1,20 @@
 package org.wcdevs.blog.cdk;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.SecurityGroup;
+import software.amazon.awscdk.services.ec2.SubnetConfiguration;
+import software.amazon.awscdk.services.ec2.SubnetType;
+import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ICluster;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
@@ -29,18 +34,30 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 
+/**
+ * Creates a base network for an application served by an ECS. The network stack will contain a VPC,
+ * a configured number of public and isolated subnets (per AZ, default to one for each AZ), an ECS
+ * cluster, and an internet-facing load balancer with an HTTP and an optional HTTPS listener. The
+ * listeners can be used in other stacks to attach to an ECS service, for instance.
+ * <p>
+ * The construct exposes some output parameters to be used by other constructs.
+ * </p>
+ *
+ * @see Network#newInstance(Construct, String, String, InputParameters)
+ * @see Network#newInputParameters(String)
+ * @see Network#outputParametersFrom(Construct, String)
+ */
 @Setter(AccessLevel.PRIVATE)
 @Getter(AccessLevel.PACKAGE)
 public final class Network extends Construct {
+  // region private constants
   private static final String CLUSTER_NAME = "ecsCluster";
-
-  private static final String ALL_IP_PROTOCOLS = "-1";
-  // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
-  private static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
 
   private static final String PARAM_VPC_ID = "vpcId";
   private static final String PARAM_HTTP_LISTENER_ARN = "httpListenerArn";
@@ -53,7 +70,11 @@ public final class Network extends Construct {
   private static final String PARAM_AVAILABILITY_ZONES = "availabilityZn";
   private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNetId";
   private static final String PARAM_PUBLIC_SUBNETS = "publicSubNetId";
+  private static final String CONSTRUCT_NAME = "Network";
+  private static final String DASH_JOINER = "-";
+  // endregion
 
+  // region instance members
   private String environmentName;
   private IVpc vpc;
   private ICluster ecsCluster;
@@ -61,6 +82,30 @@ public final class Network extends Construct {
   private IApplicationLoadBalancer loadBalancer;
   private IApplicationListener httpListener;
   private IApplicationListener httpsListener;
+  // endregion
+
+  // region public constants
+  // see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+  public static final String ALL_IP_RANGES_CIDR = "0.0.0.0/0";
+  public static final String ALL_IP_PROTOCOLS = "-1";
+
+  /**
+   * Number of isolated subnets that will be available for each AZ by default.
+   */
+  public static final int DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ = 1;
+  /**
+   * Number of public subnets that will be available for each AZ by default.
+   */
+  public static final int DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ = 1;
+  /**
+   * Number of AZ by default.
+   */
+  public static final int DEFAULT_NUMBER_OF_AZ = 2;
+  /**
+   * Represents there's no https listener arn.
+   */
+  public static final String NULL_HTTPS_LISTENER_ARN_VALUE = "null";
+  // endregion
 
   private Network(Construct scope, String id) {
     super(scope, id);
@@ -88,10 +133,12 @@ public final class Network extends Construct {
     network.setEnvironmentName(envName);
 
     var vpc = vpcFrom(network, envName, validInParams.getNatGatewayNumber(),
+                      validInParams.getNumberOfIsolatedSubnetsPerAZ(),
+                      validInParams.getNumberOfPublicSubnetsPerAZ(),
                       validInParams.getMaxAZs());
     network.setVpc(vpc);
 
-    var cluster = clusterFrom(network, vpc, joinedString("-", envName, CLUSTER_NAME));
+    var cluster = clusterFrom(network, vpc, joinedString(DASH_JOINER, envName, CLUSTER_NAME));
     network.setEcsCluster(cluster);
 
     var loadBalancerInfo = createLoadBalancer(network, envName, vpc,
@@ -110,32 +157,59 @@ public final class Network extends Construct {
     return network;
   }
 
+  // region utility methods
   private static ICluster clusterFrom(Construct scope, IVpc vpc, String clusterName) {
     return Cluster.Builder.create(scope, "cluster").vpc(vpc).clusterName(clusterName).build();
   }
 
   private static IVpc vpcFrom(Construct scope, String environmentName, int natGatewayNumber,
+                              int numberOfIsolatedSubnetsPerAZ, int numberOfPublicSubnetsPerAZ,
                               int maxAZs) {
-    return NetworkUtil.vpcFrom(scope,
-                               joinedString("-", environmentName, "isolatedSubnet"),
-                               joinedString("-", environmentName, "publicSubnet"),
-                               natGatewayNumber, maxAZs);
+    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || natGatewayNumber < 1
+        || maxAZs < 1) {
+      String err = "The number of private/public subnets, AZs and natGatewayNumber must be >= 1";
+      throw new IllegalArgumentException(err);
+    }
+
+    var isolatedSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, "isolatedSubnet");
+    var isolatedSubnets = subnetsStreamFrom(numberOfIsolatedSubnetsPerAZ, isolatedSubnetsNamePrefix,
+                                            SubnetType.ISOLATED);
+    var publicSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, "publicSubnet");
+    var publicSubnets = subnetsStreamFrom(numberOfPublicSubnetsPerAZ, publicSubnetsNamePrefix,
+                                          SubnetType.PUBLIC);
+    var subnetConfig = Stream.concat(isolatedSubnets, publicSubnets).collect(toList());
+
+    return Vpc.Builder.create(scope, "vpc")
+                      .natGateways(natGatewayNumber)
+                      .maxAzs(maxAZs)
+                      .subnetConfiguration(subnetConfig)
+                      .build();
+  }
+
+  private static Stream<SubnetConfiguration> subnetsStreamFrom(int numberOfIsolatedSubnets,
+                                                               String subnetsNamePrefix,
+                                                               SubnetType subnetType) {
+    return IntStream.range(0, numberOfIsolatedSubnets)
+                    .mapToObj(i -> subnetFrom(subnetsNamePrefix + i, subnetType));
+  }
+
+  private static SubnetConfiguration subnetFrom(String name, SubnetType subnetType) {
+    return SubnetConfiguration.builder().subnetType(subnetType).name(name).build();
   }
 
   private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
                                                      IVpc vpc, int internalPort, int externalPort,
                                                      String sslCertificateArn) {
-    var securityGroupName = joinedString("-", environmentName, "loadbalancerSecurityGroup");
+    var securityGroupName = joinedString(DASH_JOINER, environmentName, "loadbalancerSecurityGroup");
     var description = "Public access to the load balancer.";
     var loadBalancerSecurityGroup = SecurityGroup.Builder.create(scope, "loadbalancerSecurityGroup")
                                                          .securityGroupName(securityGroupName)
                                                          .description(description)
                                                          .vpc(vpc)
                                                          .build();
-    NetworkUtil.cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId(),
-                                            ALL_IP_RANGES_CIDR, ALL_IP_PROTOCOLS);
+    cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId());
 
-    var loadbalancerName = joinedString("-", environmentName, "loadbalancer");
+    var loadbalancerName = joinedString(DASH_JOINER, environmentName, "loadbalancer");
     var loadBalancer = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
                                                       .loadBalancerName(loadbalancerName)
                                                       .vpc(vpc)
@@ -143,7 +217,7 @@ public final class Network extends Construct {
                                                       .securityGroup(loadBalancerSecurityGroup)
                                                       .build();
 
-    var targetGroupName = joinedString("-", environmentName, "no-op-targetGroup");
+    var targetGroupName = joinedString(DASH_JOINER, environmentName, "no-op-targetGroup");
     var targetGroup = singletonList(
         ApplicationTargetGroup.Builder.create(scope, "targetGroup")
                                       .vpc(vpc)
@@ -186,6 +260,16 @@ public final class Network extends Construct {
                                 httpsListener);
   }
 
+  private static CfnSecurityGroupIngress cfnSecurityGroupIngressFrom(Construct scope,
+                                                                     String lBSecyGroupId) {
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+    return CfnSecurityGroupIngress.Builder.create(scope, "ingressToLoadbalancer")
+                                          .groupId(lBSecyGroupId)
+                                          .cidrIp(ALL_IP_RANGES_CIDR)
+                                          .ipProtocol(ALL_IP_PROTOCOLS)
+                                          .build();
+  }
+
   private static void saveNetworkInfoToParameterStore(Network network) {
     createStringParameter(network, PARAM_VPC_ID, network.getVpc().getVpcId());
     createStringParameter(network, PARAM_CLUSTER_NAME, network.getEcsCluster().getClusterName());
@@ -202,7 +286,7 @@ public final class Network extends Construct {
 
     var httpsListenerArn = network.getHttpsListener() != null
                            ? network.getHttpsListener().getListenerArn()
-                           : "null";
+                           : NULL_HTTPS_LISTENER_ARN_VALUE;
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
 
     createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
@@ -235,72 +319,84 @@ public final class Network extends Construct {
   }
 
   private static String idForParameterListItem(String id, int elementIndex) {
-    return joinedString("-", id, elementIndex);
+    return joinedString(DASH_JOINER, id, elementIndex);
   }
 
   private static String parameterName(String environmentName, String parameterName) {
-    return environmentName + "-Network-" + parameterName;
+    return joinedString(DASH_JOINER, environmentName, CONSTRUCT_NAME, parameterName);
   }
+  // endregion
 
   // region parameters store getters
-  public static String getParameter(Network network, String id) {
-    var parameterName = parameterName(network.getEnvironmentName(), id);
-    return StringParameter.fromStringParameterName(network, id, parameterName).getStringValue();
+  public static String getParameter(Construct networkScope, String environmentName, String id) {
+    var parameterName = parameterName(environmentName, id);
+    return StringParameter.fromStringParameterName(networkScope, id, parameterName)
+                          .getStringValue();
   }
 
-  public static String getVPCId(Network network) {
-    return getParameter(network, PARAM_VPC_ID);
+  public static String getVPCId(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_VPC_ID);
   }
 
-  public static String getClusterName(Network network) {
-    return getParameter(network, PARAM_CLUSTER_NAME);
+  public static String getClusterName(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_CLUSTER_NAME);
   }
 
-  public static String getLoadBalancerSecurityGroupId(Network network) {
-    return getParameter(network, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID);
+  public static String getLoadBalancerSecurityGroupId(Construct networkScope,
+                                                      String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID);
   }
 
-  public static String getLoadBalancerArn(Network network) {
-    return getParameter(network, PARAM_LOAD_BALANCER_ARN);
+  public static String getLoadBalancerArn(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_LOAD_BALANCER_ARN);
   }
 
-  public static String getLoadBalancerDnsName(Network network) {
-    return getParameter(network, PARAM_LOAD_BALANCER_DNS_NAME);
+  public static String getLoadBalancerDnsName(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_LOAD_BALANCER_DNS_NAME);
   }
 
-  public static String getLoadBalancerCanonicalHostedZoneId(Network network) {
-    return getParameter(network, PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID);
+  public static String getLoadBalancerCanonicalHostedZoneId(Construct networkScope,
+                                                            String environmentName) {
+    return getParameter(networkScope, environmentName,
+                        PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID);
   }
 
-  public static String getHttpListenerArn(Network network) {
-    return getParameter(network, PARAM_HTTP_LISTENER_ARN);
+  public static String getHttpListenerArn(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_HTTP_LISTENER_ARN);
   }
 
-  public static String getHttpsListenerArn(Network network) {
-    return getParameter(network, PARAM_HTTPS_LISTENER_ARN);
+  public static String getHttpsListenerArn(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_HTTPS_LISTENER_ARN);
   }
 
-  public static List<String> getParameterList(Network network, String id, int totalElements) {
+  public static List<String> getParameterList(Construct networkScope, String environmentName,
+                                              String id, int totalElements) {
     return IntStream.range(0, totalElements)
-                    .mapToObj(i -> getParameter(network, idForParameterListItem(id, i)))
+                    .mapToObj(i -> getParameter(networkScope, environmentName,
+                                                idForParameterListItem(id, i)))
                     .collect(Collectors.toUnmodifiableList());
   }
 
-  public static List<String> getAvailabilityZones(Network network) {
-    return getParameterList(network, PARAM_AVAILABILITY_ZONES,
-                            network.getVpc().getAvailabilityZones().size());
+  public static List<String> getAvailabilityZones(Construct networkScope, String environmentName,
+                                                  int totalAvailabilityZones) {
+    return getParameterList(networkScope, environmentName, PARAM_AVAILABILITY_ZONES,
+                            totalAvailabilityZones);
   }
 
-  public static List<String> getIsolatedSubnets(Network network) {
-    return getParameterList(network, PARAM_ISOLATED_SUBNETS,
-                            network.getVpc().getIsolatedSubnets().size());
+  public static List<String> getIsolatedSubnets(Construct networkScope, String environmentName,
+                                                int totalIsolatedSubnets) {
+    return getParameterList(networkScope, environmentName, PARAM_ISOLATED_SUBNETS,
+                            totalIsolatedSubnets);
   }
 
-  public static List<String> getPublicSubnets(Network network) {
-    return getParameterList(network, PARAM_PUBLIC_SUBNETS,
-                            network.getVpc().getIsolatedSubnets().size());
+  public static List<String> getPublicSubnets(Construct networkScope, String environmentName,
+                                              int totalPublicSubnets) {
+    return getParameterList(networkScope, environmentName, PARAM_PUBLIC_SUBNETS,
+                            totalPublicSubnets);
   }
   // endregion
+
+  // region newInputParameters
 
   /**
    * Creates a new {@link InputParameters}.
@@ -321,6 +417,77 @@ public final class Network extends Construct {
   public static InputParameters newInputParameters(String sslCertificate) {
     return new InputParameters(sslCertificate);
   }
+  // endregion
+
+  // region output parameters
+
+  /**
+   * Returns a {@link Network} output parameters generated by a previously constructed
+   * {@link Network} instance.
+   *
+   * @param scope           Scope construct to be provided to the SSM to retrieve the parameters.
+   * @param environmentName Name of the environment where the {@link Network} instance was
+   *                        deployed.
+   *
+   * @return An {@link OutputParameters} instance containing the parameters from the SSM.
+   */
+  public static OutputParameters outputParametersFrom(Construct scope,
+                                                      String environmentName) {
+    return outputParametersFrom(scope, environmentName,
+                                DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ,
+                                DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ,
+                                DEFAULT_NUMBER_OF_AZ);
+  }
+
+  /**
+   * Returns the network output parameters generated by a construct where the {@link Network}
+   * instance was previously deployed.
+   *
+   * @param networkScope                 Scope where the network instance to retrieve the
+   *                                     parameters from the SSM was deployed.
+   * @param environmentName              Name of the environment where the {@link Network} instance
+   *                                     was deployed.
+   * @param numberOfIsolatedSubnetsPerAz Number of isolated subnets per AZ in the deployed network.
+   * @param numberOfPublicSubnetsPerAz   Number of public subnets per AZ in the deployed network.
+   * @param totalAvailabilityZones       Number of total availability zones in the deployed network.
+   *
+   * @return An {@link OutputParameters} instance containing the parameters from the SSM.
+   */
+  public static OutputParameters outputParametersFrom(Construct networkScope,
+                                                      String environmentName,
+                                                      int numberOfIsolatedSubnetsPerAz,
+                                                      int numberOfPublicSubnetsPerAz,
+                                                      int totalAvailabilityZones) {
+    var scope = Objects.requireNonNull(networkScope);
+    var envName = Objects.requireNonNull(environmentName);
+    if (numberOfIsolatedSubnetsPerAz < 1 || numberOfPublicSubnetsPerAz < 1
+        || totalAvailabilityZones < 1) {
+      throw new IllegalArgumentException("The number of isolated and public subnets and the "
+                                         + "total availability zones must be greater than 0");
+    }
+
+    // subnets will reside in one Availability Zone at a time:
+    // https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html#vpc-subnet-basics
+    int totalIsolatedSubnets = numberOfIsolatedSubnetsPerAz * totalAvailabilityZones;
+    int totalPublicSubnets = numberOfPublicSubnetsPerAz * totalAvailabilityZones;
+
+    return new OutputParameters(
+        getVPCId(scope, envName),
+        getHttpListenerArn(scope, envName),
+        getHttpsListenerArn(scope, envName),
+        getLoadBalancerSecurityGroupId(scope, envName),
+        getClusterName(scope, envName),
+        getIsolatedSubnets(scope, envName, totalIsolatedSubnets),
+        getPublicSubnets(scope, envName, totalPublicSubnets),
+        getAvailabilityZones(scope, envName, totalAvailabilityZones),
+        getLoadBalancerArn(scope, envName),
+        getLoadBalancerDnsName(scope, envName),
+        getLoadBalancerCanonicalHostedZoneId(scope, envName)
+    );
+  }
+  // endregion
+
+  // region inner classes
 
   /**
    * Holds the input parameters to build a new {@link Network}.
@@ -331,7 +498,9 @@ public final class Network extends Construct {
     private final String sslCertificateArn;
 
     private int natGatewayNumber;
-    private int maxAZs = 2;
+    private int numberOfIsolatedSubnetsPerAZ = DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ;
+    private int numberOfPublicSubnetsPerAZ = DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ;
+    private int maxAZs = DEFAULT_NUMBER_OF_AZ;
     private int listeningInternalPort = 8080;
     private int listeningExternalPort = 80;
 
@@ -341,6 +510,30 @@ public final class Network extends Construct {
 
     InputParameters(String sslCertificateArn) {
       this.sslCertificateArn = sslCertificateArn;
+    }
+  }
+
+  /**
+   * Holds the output parameters generated by a previously created {@link Network} stack.
+   */
+  @AllArgsConstructor(access = AccessLevel.PACKAGE)
+  @Getter(AccessLevel.PACKAGE)
+  public static final class OutputParameters {
+    private final String vpcId;
+    private final String httpListenerArn;
+    @Getter(AccessLevel.NONE)
+    private final String httpsListenerArn;
+    private final String loadbalancerSecurityGroupId;
+    private final String ecsClusterName;
+    private final List<String> isolatedSubnets;
+    private final List<String> publicSubnets;
+    private final List<String> availabilityZones;
+    private final String loadBalancerArn;
+    private final String loadBalancerDnsName;
+    private final String loadBalancerCanonicalHostedZoneId;
+
+    public Optional<String> getHttpsListenerArn() {
+      return Optional.ofNullable(httpsListenerArn);
     }
   }
 
@@ -357,4 +550,5 @@ public final class Network extends Construct {
       return Optional.ofNullable(httpsListener);
     }
   }
+  // endregion
 }
