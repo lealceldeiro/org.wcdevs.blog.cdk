@@ -23,6 +23,7 @@ import software.amazon.awscdk.services.iam.PolicyDocument;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.iam.Role;
 import software.amazon.awscdk.services.iam.ServicePrincipal;
+import software.amazon.awscdk.services.logs.ILogGroup;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.amazon.awscdk.services.logs.RetentionDays;
 
@@ -281,7 +282,7 @@ public final class AECService extends Construct {
   }
 
   private static CfnTaskDefinition.ContainerDefinitionProperty containerDefinitionProperty(Environment awsEnv,
-                                                                                           LogGroup logGroup,
+                                                                                           ILogGroup logGroup,
                                                                                            ApplicationEnvironment appEnv,
                                                                                            InputParameters params,
                                                                                            String dockerImageRepositoryUrl) {
@@ -329,7 +330,7 @@ public final class AECService extends Construct {
 
   private static CfnTaskDefinition taskDefinition(Construct scope, InputParameters params,
                                                   IRole ecsTaskExecutionRole,
-                                                  Role ecsTaskRole,
+                                                  IRole ecsTaskRole,
                                                   CfnTaskDefinition.ContainerDefinitionProperty containerDef) {
     return CfnTaskDefinition.Builder.create(scope, "taskDefinition")
                                     .cpu(String.valueOf(params.getCpu()))
@@ -418,16 +419,16 @@ public final class AECService extends Construct {
   // endregion
 
   // region inner classes
-  public InputParameters newInputParameters(DockerImage dockerImage,
-                                            Map<String, String> environmentVariables,
-                                            List<String> securityGroupIdsToGrantIngressFromEcs) {
+  public static InputParameters newInputParameters(DockerImage dockerImage,
+                                                   Map<String, String> environmentVariables,
+                                                   List<String> secGroupIdsToGrantIngressFromEcs) {
     return new InputParameters(Objects.requireNonNull(dockerImage),
                                Objects.requireNonNull(environmentVariables),
-                               Objects.requireNonNull(securityGroupIdsToGrantIngressFromEcs));
+                               Objects.requireNonNull(secGroupIdsToGrantIngressFromEcs));
   }
 
-  public DockerImage newDockerImage(String dockerRepositoryName, String dockerImageTag,
-                                    String dockerImageUrl) {
+  public static DockerImage newDockerImage(String dockerRepositoryName, String dockerImageTag,
+                                           String dockerImageUrl) {
     return new DockerImage(Objects.requireNonNull(dockerRepositoryName),
                            Objects.requireNonNull(dockerImageTag),
                            Objects.requireNonNull(dockerImageUrl));
@@ -455,7 +456,7 @@ public final class AECService extends Construct {
     private int desiredInstancesCount = 2;
     private int maximumInstancesPercent = 200;
     private int minimumHealthyInstancesPercent = 50;
-    private boolean stickySessionsEnabled = false;
+    private boolean stickySessionsEnabled;
     private int stickySessionsCookieDuration = 3600;
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
   }
@@ -477,9 +478,9 @@ public final class AECService extends Construct {
 
   @Getter(AccessLevel.PACKAGE)
   @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-  private static class ServiceListenerRules {
-    private final CfnListenerRule httpsRule;
+  static class ServiceListenerRules {
     private final CfnListenerRule httpRule;
+    private final CfnListenerRule httpsRule;
   }
   // endregion
 }
