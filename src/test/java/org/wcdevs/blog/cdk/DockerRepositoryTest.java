@@ -3,13 +3,11 @@ package org.wcdevs.blog.cdk;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecr.TagMutability;
 import software.amazon.awscdk.services.iam.Grant;
-import software.amazon.jsii.JsiiEngine;
 
 import java.security.SecureRandom;
 import java.util.Random;
@@ -51,20 +49,17 @@ class DockerRepositoryTest {
   }
 
   void testNewInstanceWithParameters(RemovalPolicy removalPolicy, TagMutability tagMutable) {
-    try (
-        MockedStatic<JsiiEngine> mockedJsiiEngine = mockStatic(JsiiEngine.class);
-        MockedStatic<Repository.Builder> mockedBuilder = mockStatic(Repository.Builder.class)
-    ) {
-      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(mock(JsiiEngine.class));
-      mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
+    StaticallyMockedCdk.executeTest(() -> {
+      try (var mockedBuilder = mockStatic(Repository.Builder.class)) {
+        mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
 
-      DockerRepository.InputParameters inParameters = mock(DockerRepository.InputParameters.class);
-      when(inParameters.removalPolicy()).thenReturn(removalPolicy);
-      when(inParameters.tagMutability()).thenReturn(tagMutable);
-      DockerRepository actual
-          = DockerRepository.newInstance(mock(Construct.class), randomString(), inParameters);
-      Assertions.assertNotNull(actual);
-    }
+        var inParams = mock(DockerRepository.InputParameters.class);
+        when(inParams.removalPolicy()).thenReturn(removalPolicy);
+        when(inParams.tagMutability()).thenReturn(tagMutable);
+        var actual = DockerRepository.newInstance(mock(Construct.class), randomString(), inParams);
+        Assertions.assertNotNull(actual);
+      }
+    });
   }
 
   @Test
@@ -74,7 +69,7 @@ class DockerRepositoryTest {
 
   @Test
   void newInputParametersOverload() {
-    Random random = new SecureRandom();
+    var random = new SecureRandom();
     Assertions.assertNotNull(DockerRepository.newInputParameters(randomString(), randomString(),
                                                                  random.nextInt(),
                                                                  random.nextBoolean(),
@@ -87,26 +82,23 @@ class DockerRepositoryTest {
 
   @Test
   void getEcRepository() {
-    try (
-        MockedStatic<JsiiEngine> mockedJsiiEngine = mockStatic(JsiiEngine.class);
-        MockedStatic<Repository.Builder> mockedBuilder = mockStatic(Repository.Builder.class)
-    ) {
-      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(mock(JsiiEngine.class));
-      mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
+    StaticallyMockedCdk.executeTest(() -> {
+      try (var mockedBuilder = mockStatic(Repository.Builder.class)) {
+        mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
 
-      DockerRepository actual
-          = DockerRepository.newInstance(mock(Construct.class), randomString(),
-                                         mock(DockerRepository.InputParameters.class));
-      assertEquals(repositoryMock, actual.getEcRepository());
-    }
+        var actual
+            = DockerRepository.newInstance(mock(Construct.class), randomString(),
+                                           mock(DockerRepository.InputParameters.class));
+        assertEquals(repositoryMock, actual.getEcRepository());
+      }
+    });
   }
 
   @Test
   void requiredConstructor() {
-    String repositoryName = randomString();
-    String accountId = randomString();
-    DockerRepository.InputParameters actual = new DockerRepository.InputParameters(repositoryName,
-                                                                                   accountId);
+    var repositoryName = randomString();
+    var accountId = randomString();
+    var actual = new DockerRepository.InputParameters(repositoryName, accountId);
     Assertions.assertNotNull(actual);
     assertEquals(repositoryName, actual.getRepositoryName());
     assertEquals(accountId, actual.getAccountId());
@@ -137,14 +129,14 @@ class DockerRepositoryTest {
   void testAllArgsConstructor(int expectedMaxImageCount, boolean expectedRetainRegistry,
                               RemovalPolicy expectedRemovalPolicy, boolean expectedInmutableTags,
                               TagMutability expectedTagMutability) {
-    String repositoryName = randomString();
-    String accountId = randomString();
+    var repoName = randomString();
+    var accountId = randomString();
 
-    DockerRepository.InputParameters actual
-        = new DockerRepository.InputParameters(repositoryName, accountId, expectedMaxImageCount,
-                                               expectedRetainRegistry, expectedInmutableTags);
+    var actual = new DockerRepository.InputParameters(repoName, accountId, expectedMaxImageCount,
+                                                      expectedRetainRegistry,
+                                                      expectedInmutableTags);
     Assertions.assertNotNull(actual);
-    assertEquals(repositoryName, actual.getRepositoryName());
+    assertEquals(repoName, actual.getRepositoryName());
     assertEquals(accountId, actual.getAccountId());
     assertEquals(expectedMaxImageCount, actual.getMaxImageCount());
     assertEquals(expectedRetainRegistry, actual.isRetainRegistryOnDelete());
