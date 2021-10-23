@@ -76,11 +76,16 @@ public final class PostgreSQL extends Construct {
     // IVpc#fromLookup is broken (https://github.com/aws/aws-cdk/issues/3600)
     var netOutParams = Network.outputParametersFrom(postgreSql,
                                                     applicationEnvironment.getEnvironmentName());
-    if (netOutParams.getAvailabilityZones().isEmpty()) {
-      throw new IllegalStateException("No availability zones in network");
+    var availabilityZones = netOutParams.getAvailabilityZones();
+    if (availabilityZones == null || availabilityZones.isEmpty()) {
+      throw new IllegalArgumentException("No availability zones in network");
     }
 
-    var secGroup = cfnSecurityGroup(postgreSql, netOutParams.getVpcId(),
+    var vpcId = netOutParams.getVpcId();
+    if (vpcId == null) {
+      throw new IllegalArgumentException("No VPC in network");
+    }
+    var secGroup = cfnSecurityGroup(postgreSql, vpcId,
                                     applicationEnvironment.prefixed("postgresSqlSecurityGroup"));
     postgreSql.setDbSecurityGroup(secGroup);
 
@@ -93,11 +98,10 @@ public final class PostgreSQL extends Construct {
     var subnetGroup = cfnDBSubnetGroup(postgreSql, subnetGroupName,
                                        netOutParams.getIsolatedSubnets());
 
-    var availabilityZone = netOutParams.getAvailabilityZones().get(0);
     subnetGroupName = subnetGroup.getDbSubnetGroupName();
     var dbName = Util.dbSanitized(applicationEnvironment.prefixed("database"));
     var dbPassword = dbSecret.secretValueFromJson(PASSWORD_SECRET_HOLDER).toString();
-    var dbInstance = dbInstance(postgreSql, inParams, availabilityZone, subnetGroupName,
+    var dbInstance = dbInstance(postgreSql, inParams, availabilityZones.get(0), subnetGroupName,
                                 dbName, username, dbPassword, secGroup.getAttrGroupId(), false);
     postgreSql.setDbInstance(dbInstance);
 
