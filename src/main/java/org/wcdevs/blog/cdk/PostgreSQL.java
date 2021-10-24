@@ -2,6 +2,7 @@ package org.wcdevs.blog.cdk;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -278,8 +279,9 @@ public final class PostgreSQL extends Construct {
    */
   @Setter
   @Getter(AccessLevel.PACKAGE)
-  @AllArgsConstructor(access = AccessLevel.PRIVATE)
-  @NoArgsConstructor(access = AccessLevel.PRIVATE)
+  @AllArgsConstructor(access = AccessLevel.PACKAGE)
+  @NoArgsConstructor(access = AccessLevel.PACKAGE)
+  @EqualsAndHashCode
   public static class InputParameters {
     private int storageCapacityInGB = 10;
     /**
@@ -300,6 +302,7 @@ public final class PostgreSQL extends Construct {
    */
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   @Getter(AccessLevel.PACKAGE)
+  @EqualsAndHashCode
   public static final class OutputParameters {
     private final String endpointAddress;
     private final String endpointPort;

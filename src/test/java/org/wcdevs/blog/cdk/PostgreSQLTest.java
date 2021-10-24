@@ -7,6 +7,7 @@ import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -129,16 +130,16 @@ class PostgreSQLTest {
     }
   }
 
-  void testGetParameter(BiFunction<? super Construct, ? super ApplicationEnvironment, String> getParameterFn) {
+  void testGetParameter(BiFunction<? super Construct, ? super ApplicationEnvironment, String> fn) {
     StaticallyMockedCdk.executeTest(() -> {
       var expected = randomString();
       var iStringParameter = mock(IStringParameter.class);
       when(iStringParameter.getStringValue()).thenReturn(expected);
       try (var mockedStringParameter = mockStatic(StringParameter.class)) {
-        mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
+        mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(),
+                                                                                 any()))
                              .thenReturn(iStringParameter);
-        assertEquals(expected,
-                     getParameterFn.apply(mock(Construct.class), mock(ApplicationEnvironment.class)));
+        assertEquals(expected, fn.apply(mock(Construct.class), mock(ApplicationEnvironment.class)));
       }
     });
   }
@@ -170,26 +171,106 @@ class PostgreSQLTest {
 
   @Test
   void outputParametersFrom() {
+    var dbEndpointAddress = randomString();
+    var dbEndpointPort = randomString();
+    var dbName = randomString();
+    var dbSecretArn = randomString();
+    var dbSecurityGroupId = randomString();
+
+    var expected = new PostgreSQL.OutputParameters(dbEndpointAddress, dbEndpointPort, dbName,
+                                                   dbSecretArn, dbSecurityGroupId);
+    var iStringParameter = mock(IStringParameter.class);
+    when(iStringParameter.getStringValue()).thenReturn(dbEndpointAddress)
+                                           .thenReturn(dbEndpointPort)
+                                           .thenReturn(dbName)
+                                           .thenReturn(dbSecretArn)
+                                           .thenReturn(dbSecurityGroupId);
+
+    StaticallyMockedCdk.executeTest(() -> {
+      try (var mockedStringParameter = mockStatic(StringParameter.class)) {
+        mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(),
+                                                                                 any()))
+                             .thenReturn(iStringParameter);
+        assertEquals(expected, PostgreSQL.outputParametersFrom(mock(Construct.class),
+                                                               mock(ApplicationEnvironment.class)));
+      }
+    });
 
   }
 
   @Test
   void newInputParametersNoArgs() {
+    assertEquals(new PostgreSQL.InputParameters(), PostgreSQL.newInputParameters());
   }
 
   @Test
   void newInputParametersArgs() {
+    var storageCapacityInGB = new SecureRandom().nextInt();
+    var instanceClass = randomString();
+    var version = randomString();
+    assertEquals(new PostgreSQL.InputParameters(storageCapacityInGB, instanceClass, version),
+                 PostgreSQL.newInputParameters(storageCapacityInGB, instanceClass, version));
   }
 
   @Test
-  void getDbSecurityGroup() {
+  void testInputParametersSetStorageCapacity() {
+    var storageCapacity = new SecureRandom().nextInt();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    inputParams.setStorageCapacityInGB(storageCapacity);
+
+    assertEquals(storageCapacity,
+                 TestsReflectionUtil.<Integer>getField(inputParams, "storageCapacityInGB"));
   }
 
   @Test
-  void getDbSecret() {
+  void testInputParametersSetInstanceClass() {
+    var instanceClass = randomString();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    inputParams.setInstanceClass(instanceClass);
+
+    assertEquals(instanceClass, TestsReflectionUtil.getField(inputParams, "instanceClass"));
   }
 
   @Test
-  void getDbInstance() {
+  void testInputParametersSetPostgresVersion() {
+    var version = randomString();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    inputParams.setPostgresVersion(version);
+
+    assertEquals(version, TestsReflectionUtil.getField(inputParams, "postgresVersion"));
+  }
+
+  @Test
+  void testInputParametersGetStorageCapacity() {
+    var storageCapacity = new SecureRandom().nextInt();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    TestsReflectionUtil.setField(inputParams, "storageCapacityInGB", storageCapacity);
+
+    assertEquals(storageCapacity, inputParams.getStorageCapacityInGB());
+    assertEquals(String.valueOf(storageCapacity), inputParams.getStorageCapacityInGBString());
+  }
+
+  @Test
+  void testInputParametersGetInstanceClass() {
+    var instanceClass = randomString();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    TestsReflectionUtil.setField(inputParams, "instanceClass", instanceClass);
+
+    assertEquals(instanceClass, inputParams.getInstanceClass());
+  }
+
+  @Test
+  void testInputParametersGetpostgresVersion() {
+    var postgresVersion = randomString();
+    var inputParams = new PostgreSQL.InputParameters();
+
+    TestsReflectionUtil.setField(inputParams, "postgresVersion", postgresVersion);
+
+    assertEquals(postgresVersion, inputParams.getPostgresVersion());
   }
 }
