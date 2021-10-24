@@ -16,11 +16,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class ApplicationEnvironmentTest {
-  @BeforeEach
-  void setUp() {
-
-  }
-
   private static String randomString() {
     return UUID.randomUUID().toString();
   }

@@ -1,6 +1,5 @@
 package org.wcdevs.blog.cdk;
 
-import com.fasterxml.jackson.databind.node.TextNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import software.amazon.awscdk.core.Construct;
@@ -15,10 +14,6 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBal
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCertificate;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
-import software.amazon.jsii.JsiiClient;
-import software.amazon.jsii.JsiiEngine;
-import software.amazon.jsii.JsiiObjectMapper;
-import software.amazon.jsii.Kernel;
 
 import java.security.SecureRandom;
 import java.util.Collections;
@@ -70,115 +65,103 @@ class NetworkTest {
   }
 
   void testNewInstance(String sslCertificateArg, int numberOfIsolatedSubnetsPerAZ,
-                       int numberOfPublicSubnetsPerAZ, int natGatewayNumber, int maxAZs) {
-    var subnets = Collections.singletonList(mock(ISubnet.class));
-    when(subnets.get(0).getSubnetId()).thenReturn(randomString());
+                       int numberPublicSubnetsPerAZ, int natGatewayNumber, int maxAZs) {
+    StaticallyMockedCdk.executeTest(() -> {
+      var subnets = Collections.singletonList(mock(ISubnet.class));
+      when(subnets.get(0).getSubnetId()).thenReturn(randomString());
 
-    var vpcMock = mock(IVpc.class);
-    when(vpcMock.getVpcId()).thenReturn(randomString());
-    when(vpcMock.getAvailabilityZones()).thenReturn(Collections.singletonList(randomString()));
-    when(vpcMock.getIsolatedSubnets()).thenReturn(subnets);
-    when(vpcMock.getPublicSubnets()).thenReturn(subnets);
+      var vpcMock = mock(IVpc.class);
+      when(vpcMock.getVpcId()).thenReturn(randomString());
+      when(vpcMock.getAvailabilityZones()).thenReturn(Collections.singletonList(randomString()));
+      when(vpcMock.getIsolatedSubnets()).thenReturn(subnets);
+      when(vpcMock.getPublicSubnets()).thenReturn(subnets);
 
-    var subnetConfigurationBuilderMock = mock(SubnetConfiguration.Builder.class);
-    when(subnetConfigurationBuilderMock.subnetType(any()))
-        .thenReturn(subnetConfigurationBuilderMock);
-    when(subnetConfigurationBuilderMock.name(any()))
-        .thenReturn(subnetConfigurationBuilderMock);
-    when(subnetConfigurationBuilderMock.build())
-        .thenReturn(mock(SubnetConfiguration.class));
+      var subnetConfigurationBuilderMock = mock(SubnetConfiguration.Builder.class);
+      when(subnetConfigurationBuilderMock.subnetType(any()))
+          .thenReturn(subnetConfigurationBuilderMock);
+      when(subnetConfigurationBuilderMock.name(any()))
+          .thenReturn(subnetConfigurationBuilderMock);
+      when(subnetConfigurationBuilderMock.build())
+          .thenReturn(mock(SubnetConfiguration.class));
 
-    var clusterMock = mock(Cluster.class);
-    when(clusterMock.getClusterName()).thenReturn(randomString());
+      var clusterMock = mock(Cluster.class);
+      when(clusterMock.getClusterName()).thenReturn(randomString());
 
-    var clusterBuilderMock = mock(Cluster.Builder.class);
-    when(clusterBuilderMock.vpc(any())).thenReturn(clusterBuilderMock);
-    when(clusterBuilderMock.clusterName(any())).thenReturn(clusterBuilderMock);
-    when(clusterBuilderMock.build()).thenReturn(clusterMock);
+      var clusterBuilderMock = mock(Cluster.Builder.class);
+      when(clusterBuilderMock.vpc(any())).thenReturn(clusterBuilderMock);
+      when(clusterBuilderMock.clusterName(any())).thenReturn(clusterBuilderMock);
+      when(clusterBuilderMock.build()).thenReturn(clusterMock);
 
-    var secGroupMock = mock(SecurityGroup.class);
-    when(secGroupMock.getSecurityGroupId()).thenReturn(randomString());
+      var secGroupMock = mock(SecurityGroup.class);
+      when(secGroupMock.getSecurityGroupId()).thenReturn(randomString());
 
-    var secGroupBuilderMock = mock(SecurityGroup.Builder.class);
-    when(secGroupBuilderMock.securityGroupName(any())).thenReturn(secGroupBuilderMock);
-    when(secGroupBuilderMock.description(any())).thenReturn(secGroupBuilderMock);
-    when(secGroupBuilderMock.vpc(any())).thenReturn(secGroupBuilderMock);
-    when(secGroupBuilderMock.build()).thenReturn(secGroupMock);
+      var secGroupBuilderMock = mock(SecurityGroup.Builder.class);
+      when(secGroupBuilderMock.securityGroupName(any())).thenReturn(secGroupBuilderMock);
+      when(secGroupBuilderMock.description(any())).thenReturn(secGroupBuilderMock);
+      when(secGroupBuilderMock.vpc(any())).thenReturn(secGroupBuilderMock);
+      when(secGroupBuilderMock.build()).thenReturn(secGroupMock);
 
-    var httpListener = mock(ApplicationListener.class);
-    doNothing().when(httpListener).addTargetGroups(any(), any());
-    when(httpListener.getListenerArn()).thenReturn(randomString());
+      var httpListener = mock(ApplicationListener.class);
+      doNothing().when(httpListener).addTargetGroups(any(), any());
+      when(httpListener.getListenerArn()).thenReturn(randomString());
 
-    var appLoadBalancerMock = mock(ApplicationLoadBalancer.class);
-    when(appLoadBalancerMock.addListener(any(), any())).thenReturn(httpListener);
-    when(appLoadBalancerMock.getLoadBalancerArn()).thenReturn(randomString());
-    when(appLoadBalancerMock.getLoadBalancerDnsName()).thenReturn(randomString());
-    when(appLoadBalancerMock.getLoadBalancerCanonicalHostedZoneId()).thenReturn(randomString());
+      var appLoadBalancerMock = mock(ApplicationLoadBalancer.class);
+      when(appLoadBalancerMock.addListener(any(), any())).thenReturn(httpListener);
+      when(appLoadBalancerMock.getLoadBalancerArn()).thenReturn(randomString());
+      when(appLoadBalancerMock.getLoadBalancerDnsName()).thenReturn(randomString());
+      when(appLoadBalancerMock.getLoadBalancerCanonicalHostedZoneId()).thenReturn(randomString());
 
-    var appLoadBalancerBuilderMock = mock(ApplicationLoadBalancer.Builder.class);
-    when(appLoadBalancerBuilderMock.loadBalancerName(any())).thenReturn(appLoadBalancerBuilderMock);
-    when(appLoadBalancerBuilderMock.vpc(any())).thenReturn(appLoadBalancerBuilderMock);
-    when(appLoadBalancerBuilderMock.internetFacing(anyBoolean()))
-        .thenReturn(appLoadBalancerBuilderMock);
-    when(appLoadBalancerBuilderMock.securityGroup(any())).thenReturn(appLoadBalancerBuilderMock);
-    when(appLoadBalancerBuilderMock.build()).thenReturn(appLoadBalancerMock);
+      var appLoBalancerBuilderMock = mock(ApplicationLoadBalancer.Builder.class);
+      when(appLoBalancerBuilderMock.loadBalancerName(any())).thenReturn(appLoBalancerBuilderMock);
+      when(appLoBalancerBuilderMock.vpc(any())).thenReturn(appLoBalancerBuilderMock);
+      when(appLoBalancerBuilderMock.internetFacing(anyBoolean()))
+          .thenReturn(appLoBalancerBuilderMock);
+      when(appLoBalancerBuilderMock.securityGroup(any())).thenReturn(appLoBalancerBuilderMock);
+      when(appLoBalancerBuilderMock.build()).thenReturn(appLoadBalancerMock);
 
-    var sslCertificateMock = mock(ListenerCertificate.class);
+      var sslCertificateMock = mock(ListenerCertificate.class);
 
-    var stringParameterBuilder = mock(StringParameter.Builder.class);
-    when(stringParameterBuilder.parameterName(any())).thenReturn(stringParameterBuilder);
-    when(stringParameterBuilder.stringValue(any())).thenReturn(stringParameterBuilder);
-    when(stringParameterBuilder.build()).thenReturn(mock(StringParameter.class));
+      var stringParameterBuilder = mock(StringParameter.Builder.class);
+      when(stringParameterBuilder.parameterName(any())).thenReturn(stringParameterBuilder);
+      when(stringParameterBuilder.stringValue(any())).thenReturn(stringParameterBuilder);
+      when(stringParameterBuilder.build()).thenReturn(mock(StringParameter.class));
 
-    var tagsMock = mock(Tags.class);
-    doNothing().when(tagsMock).add(any(), any());
+      var tagsMock = mock(Tags.class);
+      doNothing().when(tagsMock).add(any(), any());
 
-    try (
-        var mockedKernel = mockStatic(Kernel.class);
-        var mockedJsiiEngine = mockStatic(JsiiEngine.class);
-        var mockedJsiiObjectMapper = mockStatic(JsiiObjectMapper.class);
-        var mockedStringParameterBuilder = mockStatic(StringParameter.Builder.class);
-        var mockedApplicationLoadBalancer = mockStatic(ApplicationLoadBalancer.Builder.class);
-        var mockedTags = mockStatic(Tags.class);
-        var mockedListenerCertificate = mockStatic(ListenerCertificate.class)
-    ) {
-      mockedKernel.when(() -> Kernel.get(any(), any(), any())).then(TestsUtil::kernelAnswer);
+      try (
+          var mockedStringParameterBuilder = mockStatic(StringParameter.Builder.class);
+          var mockedApplicationLoBalancer = mockStatic(ApplicationLoadBalancer.Builder.class);
+          var mockedTags = mockStatic(Tags.class);
+          var mockedListenerCertificate = mockStatic(ListenerCertificate.class)
+      ) {
+        mockedStringParameterBuilder.when(() -> StringParameter.Builder.create(any(), any()))
+                                    .thenReturn(stringParameterBuilder);
+        mockedApplicationLoBalancer.when(() -> ApplicationLoadBalancer.Builder.create(any(), any()))
+                                     .thenReturn(appLoBalancerBuilderMock);
+        mockedListenerCertificate.when(() -> ListenerCertificate.fromArn(any()))
+                                 .thenReturn(sslCertificateMock);
+        mockedTags.when(() -> Tags.of(any())).thenReturn(tagsMock);
 
-      var jsiiClientMock = mock(JsiiClient.class);
-      when(jsiiClientMock.getStaticPropertyValue(any(), any()))
-          .thenReturn(new TextNode("mockData"));
-      var jsiiEngineMock = mock(JsiiEngine.class);
-      when(jsiiEngineMock.getClient()).thenReturn(jsiiClientMock);
-      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(jsiiEngineMock);
+        var scope = mock(Construct.class);
+        var inputParams = mock((Network.InputParameters.class));
+        when(inputParams.getSslCertificateArn()).thenReturn(sslCertificateArg);
+        when(inputParams.getMaxAZs()).thenReturn(maxAZs);
+        when(inputParams.getNumberOfIsolatedSubnetsPerAZ())
+            .thenReturn(numberOfIsolatedSubnetsPerAZ);
+        when(inputParams.getNumberOfPublicSubnetsPerAZ()).thenReturn(numberPublicSubnetsPerAZ);
+        when(inputParams.getNatGatewayNumber()).thenReturn(natGatewayNumber);
 
-      mockedJsiiObjectMapper.when(() -> JsiiObjectMapper.treeToValue(any(), any()))
-                            .then(TestsUtil::jsiiObjectMapperAnswer);
-      mockedStringParameterBuilder.when(() -> StringParameter.Builder.create(any(), any()))
-                                  .thenReturn(stringParameterBuilder);
-      mockedApplicationLoadBalancer.when(() -> ApplicationLoadBalancer.Builder.create(any(), any()))
-                                   .thenReturn(appLoadBalancerBuilderMock);
-      mockedListenerCertificate.when(() -> ListenerCertificate.fromArn(any()))
-                               .thenReturn(sslCertificateMock);
-      mockedTags.when(() -> Tags.of(any())).thenReturn(tagsMock);
-
-      var scope = mock(Construct.class);
-      var inputParameters = mock((Network.InputParameters.class));
-      when(inputParameters.getSslCertificateArn()).thenReturn(sslCertificateArg);
-      when(inputParameters.getMaxAZs()).thenReturn(maxAZs);
-      when(inputParameters.getNumberOfIsolatedSubnetsPerAZ())
-          .thenReturn(numberOfIsolatedSubnetsPerAZ);
-      when(inputParameters.getNumberOfPublicSubnetsPerAZ()).thenReturn(numberOfPublicSubnetsPerAZ);
-      when(inputParameters.getNatGatewayNumber()).thenReturn(natGatewayNumber);
-
-      Network actual = Network.newInstance(scope, randomString(), randomString(), inputParameters);
-      assertNotNull(actual);
-    }
+        var actual = Network.newInstance(scope, randomString(), randomString(), inputParams);
+        assertNotNull(actual);
+      }
+    });
   }
 
   @Test
   void getParameter() {
     var stringParamMock = mock(IStringParameter.class);
-    String expected = "null";
+    String expected = randomString();
     when(stringParamMock.getStringValue()).thenReturn(expected);
 
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
