@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 final class Util {
   static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9-]";
+  static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
 
   private Util() {
   }
@@ -34,5 +35,22 @@ final class Util {
    */
   static String sanitize(String value) {
     return Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES, "");
+  }
+
+  /**
+   * Returns the provided string with all characters not compatible with a DB name striped.
+   *
+   * @param value String value to be sanitized.
+   *
+   * @return The sanitized String.
+   */
+  static String dbSanitized(String value) {
+    var alphanumeric = Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES, "");
+    if (alphanumeric.isEmpty()) {
+      alphanumeric = "dbName";
+    }
+    return alphanumeric.substring(0, 1).matches(LOWERCASE_LETTERS_ONLY)
+           ? alphanumeric
+           : "a" + alphanumeric;
   }
 }

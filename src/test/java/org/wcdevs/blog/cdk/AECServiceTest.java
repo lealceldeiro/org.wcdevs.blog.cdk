@@ -1,6 +1,5 @@
 package org.wcdevs.blog.cdk;
 
-import com.fasterxml.jackson.databind.node.TextNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import software.amazon.awscdk.core.Construct;
@@ -12,9 +11,6 @@ import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.elasticloadbalancingv2.CfnListenerRule;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.logs.RetentionDays;
-import software.amazon.jsii.JsiiClient;
-import software.amazon.jsii.JsiiEngine;
-import software.amazon.jsii.Kernel;
 
 import java.security.SecureRandom;
 import java.util.List;
@@ -87,65 +83,55 @@ class AECServiceTest {
                        List<PolicyStatement> taskPolicyStatements, Boolean isEcrSource,
                        Map<String, String> environmentVars, boolean stickySession,
                        List<String> securityGroupIdsToGrantIngressFromEcs) {
-    // given
-    try (
-        var mockedJsiiEngine = mockStatic(JsiiEngine.class);
-        var mockedKernel = mockStatic(Kernel.class);
-        var mockedFn = mockStatic(Fn.class);
-        var mockedRepository = mockStatic(Repository.class);
-    ) {
-      // static mocks
-      mockedKernel.when(() -> Kernel.get(any(), any(), any())).then(TestsUtil::kernelAnswer);
+    StaticallyMockedCdk.executeTest(() -> {
+      // given
+      try (
+          var mockedFn = mockStatic(Fn.class);
+          var mockedRepository = mockStatic(Repository.class)
+      ) {
+        mockedFn.when(() -> Fn.conditionEquals(any(), any()))
+                .thenReturn(mock(ICfnRuleConditionExpression.class));
+        mockedFn.when(() -> Fn.conditionNot(any()))
+                .thenReturn(mock(ICfnRuleConditionExpression.class));
+        mockedRepository.when(() -> Repository.fromRepositoryName(any(), any(), any()))
+                        .thenReturn(mock(IRepository.class));
 
-      var jsiiClientMock = mock(JsiiClient.class);
-      when(jsiiClientMock.getStaticPropertyValue(any(), any())).thenReturn(new TextNode("mockData"));
-      var jsiiEngineMock = mock(JsiiEngine.class);
-      when(jsiiEngineMock.getClient()).thenReturn(jsiiClientMock);
-      mockedJsiiEngine.when(JsiiEngine::getInstance).thenReturn(jsiiEngineMock);
+        var scope = mock(Construct.class);
+        var id = randomString();
 
-      mockedFn.when(() -> Fn.conditionEquals(any(), any()))
-              .thenReturn(mock(ICfnRuleConditionExpression.class));
-      mockedFn.when(() -> Fn.conditionNot(any()))
-              .thenReturn(mock(ICfnRuleConditionExpression.class));
-      mockedRepository.when(() -> Repository.fromRepositoryName(any(), any(), any()))
-                      .thenReturn(mock(IRepository.class));
+        var awsEnvironment = mock(Environment.class);
+        when(awsEnvironment.getRegion()).thenReturn(randomString());
 
-      // input mocks
-      var scope = mock(Construct.class);
-      var id = randomString();
+        var appEnv = mock(ApplicationEnvironment.class);
+        when(appEnv.prefixed(any())).thenReturn(randomString());
 
-      var awsEnvironment = mock(Environment.class);
-      when(awsEnvironment.getRegion()).thenReturn(randomString());
+        var dockerImageMock = mock(AECService.DockerImage.class);
+        when(dockerImageMock.isEcrSource()).thenReturn(isEcrSource);
+        when(dockerImageMock.getDockerRepositoryName()).thenReturn(randomString());
+        when(dockerImageMock.getDockerImageTag()).thenReturn(randomString());
+        when(dockerImageMock.getDockerImageUrl()).thenReturn(randomString());
 
-      var appEnv = mock(ApplicationEnvironment.class);
-      when(appEnv.prefixed(any())).thenReturn(randomString());
+        var inputParams = mock(AECService.InputParameters.class);
+        when(inputParams.getTaskRolePolicyStatements()).thenReturn(taskPolicyStatements);
+        when(inputParams.getDockerImage()).thenReturn(dockerImageMock);
+        when(inputParams.getAwsLogsDateTimeFormat()).thenReturn(randomString());
+        when(inputParams.getEnvironmentVariables()).thenReturn(environmentVars);
+        when(inputParams.getTaskRolePolicyStatements()).thenReturn(taskPolicyStatements);
+        when(inputParams.isStickySessionsEnabled()).thenReturn(stickySession);
+        when(inputParams.getSecurityGroupIdsToGrantIngressFromEcs())
+            .thenReturn(securityGroupIdsToGrantIngressFromEcs);
 
-      var dockerImageMock = mock(AECService.DockerImage.class);
-      when(dockerImageMock.isEcrSource()).thenReturn(isEcrSource);
-      when(dockerImageMock.getDockerRepositoryName()).thenReturn(randomString());
-      when(dockerImageMock.getDockerImageTag()).thenReturn(randomString());
-      when(dockerImageMock.getDockerImageUrl()).thenReturn(randomString());
+        var netOutParams = mock(Network.OutputParameters.class);
+        when(netOutParams.getHttpsListenerArn()).thenReturn(Optional.ofNullable(httpsListenerArn));
+        when(netOutParams.getHttpListenerArn()).thenReturn(httpListenerArn);
 
-      var inputParams = mock(AECService.InputParameters.class);
-      when(inputParams.getTaskRolePolicyStatements()).thenReturn(taskPolicyStatements);
-      when(inputParams.getDockerImage()).thenReturn(dockerImageMock);
-      when(inputParams.getAwsLogsDateTimeFormat()).thenReturn(randomString());
-      when(inputParams.getEnvironmentVariables()).thenReturn(environmentVars);
-      when(inputParams.getTaskRolePolicyStatements()).thenReturn(taskPolicyStatements);
-      when(inputParams.isStickySessionsEnabled()).thenReturn(stickySession);
-      when(inputParams.getSecurityGroupIdsToGrantIngressFromEcs())
-          .thenReturn(securityGroupIdsToGrantIngressFromEcs);
-
-      var netOutParams = mock(Network.OutputParameters.class);
-      when(netOutParams.getHttpsListenerArn()).thenReturn(Optional.ofNullable(httpsListenerArn));
-      when(netOutParams.getHttpListenerArn()).thenReturn(httpListenerArn);
-
-      // when
-      var actual = AECService.newInstance(scope, id, awsEnvironment, appEnv, inputParams,
-                                          netOutParams);
-      // then
-      assertNotNull(actual);
-    }
+        // when
+        var actual = AECService.newInstance(scope, id, awsEnvironment, appEnv, inputParams,
+                                            netOutParams);
+        // then
+        assertNotNull(actual);
+      }
+    });
   }
 
   @Test
@@ -225,7 +211,8 @@ class AECServiceTest {
   void testInputParameterGetSecGroupIdsToGrantIngressFromEcs() {
     List<String> secGroupIdsToGrantIngressFromEcs = emptyList();
     var inputParameters = new AECService.InputParameters(mock(AECService.DockerImage.class),
-                                                         emptyMap(), secGroupIdsToGrantIngressFromEcs);
+                                                         emptyMap(),
+                                                         secGroupIdsToGrantIngressFromEcs);
 
     assertEquals(secGroupIdsToGrantIngressFromEcs,
                  inputParameters.getSecurityGroupIdsToGrantIngressFromEcs());
