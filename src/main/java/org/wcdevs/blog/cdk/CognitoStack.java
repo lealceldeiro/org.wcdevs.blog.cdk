@@ -62,6 +62,8 @@ public final class CognitoStack extends Stack {
                                          ApplicationEnvironment applicationEnvironment,
                                          InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
+    var region = Objects.requireNonNull(awsEnvironment.getRegion());
+
     var cognitoPros = StackProps.builder()
                                 .stackName(applicationEnvironment.prefixed(CONSTRUCT_NAME))
                                 .env(awsEnvironment)
@@ -70,12 +72,10 @@ public final class CognitoStack extends Stack {
 
     var userPool = userPool(cognitoStack, inParams);
     var userPoolClient = userPoolClient(cognitoStack, userPool, inParams);
-    var logoutUrl = String.format(LOG_OUT_URL_TPL, inParams.getLoginPageDomainPrefix(),
-                                  Objects.requireNonNull(awsEnvironment.getRegion()));
+    var logoutUrl = String.format(LOG_OUT_URL_TPL, inParams.getLoginPageDomainPrefix(), region);
     var userPoolDomain = userPoolDomain(cognitoStack, userPool, inParams);
 
-    var userPoolClientSecret = userPoolClientSecret(cognitoStack, awsEnvironment.getRegion(),
-                                                    userPool.getUserPoolId(),
+    var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
                                                     userPoolClient.getUserPoolClientId());
 
     createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_ID,
