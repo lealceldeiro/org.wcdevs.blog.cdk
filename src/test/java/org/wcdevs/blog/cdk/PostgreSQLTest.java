@@ -3,6 +3,7 @@ package org.wcdevs.blog.cdk;
 import org.junit.jupiter.api.Test;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.SecretValue;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
@@ -272,5 +273,31 @@ class PostgreSQLTest {
     TestsReflectionUtil.setField(inputParams, "postgresVersion", postgresVersion);
 
     assertEquals(postgresVersion, inputParams.getPostgresVersion());
+  }
+
+  @Test
+  void getDataBasePasswordFromSecret() {
+    testGetDBSecVal(PostgreSQL::getDataBasePasswordFromSecret);
+  }
+
+  void testGetDBSecVal(BiFunction<? super Construct, ? super PostgreSQL.OutputParameters, String> fn) {
+    var expected = randomString();
+    var secretValueMock = mock(SecretValue.class);
+    when(secretValueMock.toString()).thenReturn(expected);
+
+    var secretMock = mock(ISecret.class);
+    when(secretMock.secretValueFromJson(any())).thenReturn(secretValueMock);
+
+    try (var mockedSecret = mockStatic(Secret.class)) {
+      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), any()))
+                  .thenReturn(secretMock);
+      assertEquals(expected, fn.apply(mock(Construct.class),
+                                      mock(PostgreSQL.OutputParameters.class)));
+    }
+  }
+
+  @Test
+  void getDataBaseUsernameFromSecret() {
+    testGetDBSecVal(PostgreSQL::getDataBaseUsernameFromSecret);
   }
 }
