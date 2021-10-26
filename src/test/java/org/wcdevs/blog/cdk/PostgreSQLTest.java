@@ -265,7 +265,7 @@ class PostgreSQLTest {
   }
 
   @Test
-  void testInputParametersGetpostgresVersion() {
+  void testInputParametersGetPostgresVersion() {
     var postgresVersion = randomString();
     var inputParams = new PostgreSQL.InputParameters();
 

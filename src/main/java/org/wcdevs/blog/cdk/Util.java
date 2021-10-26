@@ -5,7 +5,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 final class Util {
-  static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9-]";
+  static final String NON_ALPHANUMERIC_VALUES_AND_HYPHEN = "[^a-zA-Z0-9-]";
+  static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9]";
   static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
 
   private Util() {
@@ -34,7 +35,7 @@ final class Util {
    * @return The sanitized String.
    */
   static String sanitize(String value) {
-    return Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES, "");
+    return Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES_AND_HYPHEN, "");
   }
 
   /**
