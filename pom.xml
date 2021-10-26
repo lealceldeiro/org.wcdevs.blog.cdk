@@ -18,7 +18,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <lombok.version>1.18.22</lombok.version>
-    <cdk.version>1.127.0</cdk.version>
+    <cdk.version>1.128.0</cdk.version>
     <junit.version>5.8.1</junit.version>
     <mockito.version>4.0.0</mockito.version>
   </properties>
@@ -190,6 +190,11 @@
     <dependency>
       <groupId>software.amazon.awscdk</groupId>
       <artifactId>ssm</artifactId>
+      <version>${cdk.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awscdk</groupId>
+      <artifactId>lambda-event-sources</artifactId>
       <version>${cdk.version}</version>
     </dependency>
   </dependencies>
