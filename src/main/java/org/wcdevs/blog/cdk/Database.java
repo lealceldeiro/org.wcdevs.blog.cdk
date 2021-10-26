@@ -21,9 +21,9 @@ import java.util.Objects;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 
 /**
- * Represents a constructs to create PostgreSQL database in an isolated subnet of a given Vpc. The
+ * Represents a constructs to create a Database in an isolated subnet of a given Vpc. The
  * following parameters need to exist in the AWS parameter store (SSM) associated to the same
- * environment the PostgreSQL DB instance is created for this construct to successfully deploy:
+ * environment the Database instance is created for this construct to successfully deploy:
  * <ul>
  *   <li>A {@link Network} vpc id </li>
  *   <li>A {@link Network} isolated subnets (2 at least)</li>
@@ -32,31 +32,30 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
  */
 @Setter(AccessLevel.PRIVATE)
 @Getter(AccessLevel.PACKAGE)
-public final class PostgreSQL extends Construct {
-  private static final String ENGINE = "postgres";
+public final class Database extends Construct {
   // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
   private static final String TARGET_TYPE_AWS_RDS_DBINSTANCE = "AWS::RDS::DBInstance";
   private static final String USERNAME_SECRET_HOLDER = "username";
   private static final String PASSWORD_SECRET_HOLDER = "password";
-  private static final String CONSTRUCT_NAME = "PostgreSql";
+  private static final String CONSTRUCT_NAME = "Database";
   private static final String DASH_JOINER = "-";
   private static final String PARAM_ENDPOINT_ADDRESS = "endpointAddress";
   private static final String PARAM_ENDPOINT_PORT = "endpointPort";
   private static final String PARAM_DATABASE_NAME = "databaseName";
   private static final String PARAM_SECURITY_GROUP_ID = "securityGroupId";
   private static final String PARAM_SECRET_ARN = "secretArn";
-  private static final String POSTGRE_SQL_SECRET = "postgreSqlSecret";
+  private static final String DATABASE_SECRET = "databaseSecret";
 
   private CfnSecurityGroup dbSecurityGroup;
   private Secret dbSecret;
   private CfnDBInstance dbInstance;
 
-  private PostgreSQL(Construct scope, String id) {
+  private Database(Construct scope, String id) {
     super(scope, id);
   }
 
   /**
-   * Creates a new {@link PostgreSQL} from a given scope, construct id, an
+   * Creates a new {@link Database} from a given scope, construct id, an
    * {@link ApplicationEnvironment} and some input parameters to configure the DB instance.
    *
    * @param scope                  Construct scope.
@@ -66,17 +65,17 @@ public final class PostgreSQL extends Construct {
    * @param inputParameters        {@link InputParameters} with configured values to creaet the DB
    *                               instance.
    *
-   * @return A new {@link PostgreSQL} instance.
+   * @return A new {@link Database} instance.
    */
-  public static PostgreSQL newInstance(Construct scope, String id,
-                                       ApplicationEnvironment applicationEnvironment,
-                                       InputParameters inputParameters) {
+  public static Database newInstance(Construct scope, String id,
+                                     ApplicationEnvironment applicationEnvironment,
+                                     InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
-    var postgreSql = new PostgreSQL(Objects.requireNonNull(scope), Objects.requireNonNull(id));
+    var database = new Database(Objects.requireNonNull(scope), Objects.requireNonNull(id));
 
     // retrieve network output params from SSM
     // IVpc#fromLookup is broken (https://github.com/aws/aws-cdk/issues/3600)
-    var netOutParams = Network.outputParametersFrom(postgreSql,
+    var netOutParams = Network.outputParametersFrom(database,
                                                     applicationEnvironment.getEnvironmentName());
     var availabilityZones = netOutParams.getAvailabilityZones();
     if (availabilityZones == null || availabilityZones.isEmpty()) {
@@ -87,41 +86,41 @@ public final class PostgreSQL extends Construct {
     if (vpcId == null) {
       throw new IllegalArgumentException("No VPC in network");
     }
-    var secGroup = cfnSecurityGroup(postgreSql, vpcId,
-                                    applicationEnvironment.prefixed("postgresSqlSecurityGroup"));
-    postgreSql.setDbSecurityGroup(secGroup);
+    var secGroup = cfnSecurityGroup(database, vpcId,
+                                    applicationEnvironment.prefixed("databaseSecurityGroup"));
+    database.setDbSecurityGroup(secGroup);
 
-    var username = Util.dbSanitized(applicationEnvironment.prefixed("pgsqluser"));
-    var dbSecret = dbSecret(postgreSql, applicationEnvironment.prefixed("postgresqlSecret"),
+    var username = Util.dbSanitized(applicationEnvironment.prefixed("dbuser"));
+    var dbSecret = dbSecret(database, applicationEnvironment.prefixed(DATABASE_SECRET),
                             username);
-    postgreSql.setDbSecret(dbSecret);
+    database.setDbSecret(dbSecret);
 
-    var subnetGroupName = applicationEnvironment.prefixed("postgreSqlSubnetGroup");
-    var subnetGroup = cfnDBSubnetGroup(postgreSql, subnetGroupName,
+    var subnetGroupName = applicationEnvironment.prefixed("databaseSubnetGroup");
+    var subnetGroup = cfnDBSubnetGroup(database, subnetGroupName,
                                        netOutParams.getIsolatedSubnets());
 
     subnetGroupName = subnetGroup.getDbSubnetGroupName();
     var dbName = Util.dbSanitized(applicationEnvironment.prefixed("database"));
     var dbPassword = dbSecret.secretValueFromJson(PASSWORD_SECRET_HOLDER).toString();
-    var dbInstance = dbInstance(postgreSql, inParams, availabilityZones.get(0), subnetGroupName,
+    var dbInstance = dbInstance(database, inParams, availabilityZones.get(0), subnetGroupName,
                                 dbName, username, dbPassword, secGroup.getAttrGroupId(), false);
-    postgreSql.setDbInstance(dbInstance);
+    database.setDbInstance(dbInstance);
 
-    cfnSecretTargetAttachment(postgreSql, dbSecret.getSecretArn(), dbInstance.getRef());
+    cfnSecretTargetAttachment(database, dbSecret.getSecretArn(), dbInstance.getRef());
 
-    savePostgreSqlInfoToParameterStore(postgreSql, applicationEnvironment);
-    applicationEnvironment.tag(postgreSql);
+    saveDatabaseInfoToParameterStore(database, applicationEnvironment);
+    applicationEnvironment.tag(database);
 
-    return postgreSql;
+    return database;
   }
 
   // region helpers
   private static CfnSecurityGroup cfnSecurityGroup(Construct scope, String vpcId,
                                                    String securityGroupName) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
-    return CfnSecurityGroup.Builder.create(scope, "postgreSqlSecurityGroup")
+    return CfnSecurityGroup.Builder.create(scope, "databaseSecurityGroup")
                                    .vpcId(vpcId)
-                                   .groupDescription("PostgreSql database security group")
+                                   .groupDescription("Database security group")
                                    .groupName(securityGroupName)
                                    .build();
   }
@@ -134,9 +133,9 @@ public final class PostgreSQL extends Construct {
                                             .passwordLength(37)
                                             .excludeCharacters("@/\\\" ")
                                             .build();
-    return Secret.Builder.create(scope, POSTGRE_SQL_SECRET)
+    return Secret.Builder.create(scope, DATABASE_SECRET)
                          .secretName(secretName)
-                         .description("Credentials to be used by the RDB (PostgreSQL) instance")
+                         .description("Credentials to be used by the RDB (Database) instance")
                          .generateSecretString(secretString)
                          .build();
   }
@@ -149,8 +148,8 @@ public final class PostgreSQL extends Construct {
                                          + "different Availability Zones in the same region. More "
                                          + "info at https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html#USER_VPC.Subnets");
     }
-    return CfnDBSubnetGroup.Builder.create(scope, "postgreSqlSubnetGroup")
-                                   .dbSubnetGroupDescription("RDB (PostgreSql) subnet group")
+    return CfnDBSubnetGroup.Builder.create(scope, "databaseSubnetGroup")
+                                   .dbSubnetGroupDescription("RDB subnet group")
                                    .dbSubnetGroupName(subnetGroupName)
                                    .subnetIds(subnetIds)
                                    .build();
@@ -161,14 +160,14 @@ public final class PostgreSQL extends Construct {
                                           String dbName, String dbUsername, String dbPassword,
                                           String securityGroupId, boolean publiclyAccessible) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
-    return CfnDBInstance.Builder.create(scope, "postgreSqlInstance")
+    return CfnDBInstance.Builder.create(scope, "databaseInstance")
                                 .allocatedStorage(inputParameters.getStorageCapacityInGBString())
                                 .availabilityZone(availabilityZone)
                                 .dbInstanceClass(inputParameters.getInstanceClass())
                                 .dbName(dbName)
                                 .dbSubnetGroupName(subnetGroupName)
-                                .engine(ENGINE)
-                                .engineVersion(inputParameters.getPostgresVersion())
+                                .engine(inputParameters.getEngine())
+                                .engineVersion(inputParameters.getEngineVersion())
                                 .masterUsername(dbUsername)
                                 .masterUserPassword(dbPassword)
                                 .publiclyAccessible(publiclyAccessible)
@@ -180,25 +179,25 @@ public final class PostgreSQL extends Construct {
                                                                      String dbSecretArn,
                                                                      String dbRef) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-secretsmanager-secrettargetattachment.html
-    return CfnSecretTargetAttachment.Builder.create(scope, "postgreSqlSecretTargetAttachment")
+    return CfnSecretTargetAttachment.Builder.create(scope, "databaseSecretTargetAttachment")
                                             .secretId(dbSecretArn)
                                             .targetId(dbRef)
                                             .targetType(TARGET_TYPE_AWS_RDS_DBINSTANCE)
                                             .build();
   }
 
-  private static void savePostgreSqlInfoToParameterStore(PostgreSQL postgreSQL,
-                                                         ApplicationEnvironment appEnvironment) {
-    createStringParameter(postgreSQL, appEnvironment, PARAM_ENDPOINT_ADDRESS,
-                          postgreSQL.getDbInstance().getAttrEndpointAddress());
-    createStringParameter(postgreSQL, appEnvironment, PARAM_ENDPOINT_PORT,
-                          postgreSQL.getDbInstance().getAttrEndpointPort());
-    createStringParameter(postgreSQL, appEnvironment, PARAM_DATABASE_NAME,
-                          postgreSQL.getDbInstance().getDbName());
-    createStringParameter(postgreSQL, appEnvironment, PARAM_SECURITY_GROUP_ID,
-                          postgreSQL.getDbSecurityGroup().getAttrGroupId());
-    createStringParameter(postgreSQL, appEnvironment, PARAM_SECRET_ARN,
-                          postgreSQL.getDbSecret().getSecretArn());
+  private static void saveDatabaseInfoToParameterStore(Database database,
+                                                       ApplicationEnvironment appEnvironment) {
+    createStringParameter(database, appEnvironment, PARAM_ENDPOINT_ADDRESS,
+                          database.getDbInstance().getAttrEndpointAddress());
+    createStringParameter(database, appEnvironment, PARAM_ENDPOINT_PORT,
+                          database.getDbInstance().getAttrEndpointPort());
+    createStringParameter(database, appEnvironment, PARAM_DATABASE_NAME,
+                          database.getDbInstance().getDbName());
+    createStringParameter(database, appEnvironment, PARAM_SECURITY_GROUP_ID,
+                          database.getDbSecurityGroup().getAttrGroupId());
+    createStringParameter(database, appEnvironment, PARAM_SECRET_ARN,
+                          database.getDbSecret().getSecretArn());
   }
 
   private static void createStringParameter(Construct scope, ApplicationEnvironment appEnvironment,
@@ -228,7 +227,7 @@ public final class PostgreSQL extends Construct {
 
   private static String getDataBaseSecretValue(Construct scope, OutputParameters outParams,
                                                String secretValueToRetrieve) {
-    return Secret.fromSecretCompleteArn(scope, POSTGRE_SQL_SECRET, outParams.getDbSecretArn())
+    return Secret.fromSecretCompleteArn(scope, DATABASE_SECRET, outParams.getDbSecretArn())
                  .secretValueFromJson(secretValueToRetrieve).toString();
   }
 
@@ -262,8 +261,8 @@ public final class PostgreSQL extends Construct {
   }
 
   /**
-   * Returns a {@link PostgreSQL} output parameters generated by a previously constructed
-   * {@link PostgreSQL} instance.
+   * Returns a {@link Database} output parameters generated by a previously constructed
+   * {@link Database} instance.
    *
    * @param scope          Scope construct to be provided to the SSM to retrieve the parameters.
    * @param appEnvironment {@link ApplicationEnvironment} to determine the application and
@@ -286,20 +285,22 @@ public final class PostgreSQL extends Construct {
     return new InputParameters();
   }
 
-  public static InputParameters newInputParameters(int storageCapacityInGB,
-                                                   String instanceClass, String postgresVersion) {
-    return new InputParameters(storageCapacityInGB, instanceClass, postgresVersion);
+  public static InputParameters newInputParameters(int storageCapacityInGB, String instanceClass,
+                                                   String engine, String engineVersion) {
+    return new InputParameters(storageCapacityInGB, instanceClass, engine, engineVersion);
   }
 
   /**
-   * Holds the input parameters to build a new {@link PostgreSQL}.
+   * Holds the input parameters to build a new {@link Database}.
    */
   @Setter
   @Getter(AccessLevel.PACKAGE)
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   @NoArgsConstructor(access = AccessLevel.PACKAGE)
   @EqualsAndHashCode
-  public static class InputParameters {
+  public static final class InputParameters {
+    public static final String ENGINE_POSTGRES = "postgres";
+
     private int storageCapacityInGB = 10;
     /**
      * RDB instance type.
@@ -307,7 +308,8 @@ public final class PostgreSQL extends Construct {
      * @see <a href="https://aws.amazon.com/rds/instance-types/">RDB Instance Types</a>
      */
     private String instanceClass = "db.t2.micro";
-    private String postgresVersion = "13.4";
+    private String engine = ENGINE_POSTGRES;
+    private String engineVersion = "13.4";
 
     String getStorageCapacityInGBString() {
       return String.valueOf(storageCapacityInGB);
@@ -315,7 +317,7 @@ public final class PostgreSQL extends Construct {
   }
 
   /**
-   * Holds the output parameters generated by a previously created {@link PostgreSQL} construct.
+   * Holds the output parameters generated by a previously created {@link Database} construct.
    */
   @Getter
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
