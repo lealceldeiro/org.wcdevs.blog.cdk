@@ -3,7 +3,6 @@ package org.wcdevs.blog.cdk;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.Value;
 import software.amazon.awscdk.core.Duration;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.Stack;
@@ -257,7 +256,7 @@ public final class CognitoStack extends Stack {
     return userPoolResource.getResponseField("UserPoolClient.ClientSecret");
   }
 
-  @Value
+  @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static class InputParameters {
     String loginPageDomainPrefix;
@@ -265,24 +264,39 @@ public final class CognitoStack extends Stack {
     String applicationName;
     String applicationUrl;
 
-    boolean selfSignUpEnabled = false;
+    boolean selfSignUpEnabled;
+    @lombok.Builder.Default
     AccountRecovery accountRecovery = AccountRecovery.EMAIL_ONLY;
-    boolean signInAutoVerifyEmail = false;
+    boolean signInAutoVerifyEmail;
+    @lombok.Builder.Default
     boolean signInAliasUsername = true;
+    @lombok.Builder.Default
     boolean signInAliasEmail = true;
+    @lombok.Builder.Default
     boolean signInCaseSensitive = true;
+    @lombok.Builder.Default
     boolean signInEmailRequired = true;
-    boolean signInEmailMutable = false;
+    boolean signInEmailMutable;
+    @lombok.Builder.Default
     Mfa mfa = Mfa.OFF;
+    @lombok.Builder.Default
     boolean passwordRequireLowercase = true;
+    @lombok.Builder.Default
     boolean passwordRequireDigits = true;
+    @lombok.Builder.Default
     boolean passwordRequireSymbols = true;
+    @lombok.Builder.Default
     boolean passwordRequireUppercase = true;
+    @lombok.Builder.Default
     int passwordMinLength = 8;
+    @lombok.Builder.Default
     int tempPasswordValidityInDays = 7;
 
+    @lombok.Builder.Default
     boolean userPoolGenerateSecret = true;
+    @lombok.Builder.Default
     List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
+    @lombok.Builder.Default
     List<String> userPoolOauthCallBackUrls = emptyList();
   }
 
