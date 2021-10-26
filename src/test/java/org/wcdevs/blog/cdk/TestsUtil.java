@@ -2,6 +2,8 @@ package org.wcdevs.blog.cdk;
 
 import org.mockito.invocation.InvocationOnMock;
 import software.amazon.awscdk.core.ICfnResourceOptions;
+import software.amazon.awscdk.services.cognito.OAuthScope;
+import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.Vpc;
 
@@ -22,29 +24,26 @@ final class TestsUtil {
   }
 
   static Object jsiiObjectMapperAnswer(InvocationOnMock invocation) {
-    String type = invocation.getArgument(1).toString();
-    if (type.contains("SimpleNativeType")) {
-      return "simpleMockData";
-    } else if (type.contains("ListNativeType")) {
-      return List.of("listItem");
-    }
-    log.warning("unmatched 'type'");
-    return "defaultMockData";
+    return answerForInvocationWithIndex(invocation, 1);
   }
 
   static Object kernelAnswer(InvocationOnMock invocation) {
-    Class<?> type = TestsReflectionUtil.getField(invocation.getArgument(2), "type");
-    ObjectType objectType = ObjectType.SIMPLE;
-    if (type == null) {
-      var elementType = TestsReflectionUtil.getField(invocation.getArgument(2), "elementType");
-      type = TestsReflectionUtil.getField(elementType, "type");
-      objectType = ObjectType.LIST;
-    }
-    return kernelAnswerFrom(type, objectType);
+    return answerForInvocationWithIndex(invocation, 2);
   }
 
-  private static Object kernelAnswerFrom(Class<?> type, ObjectType objectType) {
-    var simpleObject = kernelObjectFrom(type);
+  private static Object answerForInvocationWithIndex(InvocationOnMock invocation, int argIndex) {
+    Class<?> type = TestsReflectionUtil.getField(invocation.getArgument(argIndex), "type");
+    ObjectType objectType = ObjectType.SIMPLE;
+    if (type == null) {
+      var elType = TestsReflectionUtil.getField(invocation.getArgument(argIndex), "elementType");
+      type = TestsReflectionUtil.getField(elType, "type");
+      objectType = ObjectType.LIST;
+    }
+    return answerFrom(type, objectType);
+  }
+
+  private static Object answerFrom(Class<?> type, ObjectType objectType) {
+    var simpleObject = objectFrom(type);
     switch (objectType) {
       case LIST:
         return List.of(simpleObject);
@@ -57,7 +56,7 @@ final class TestsUtil {
     return simpleObject;
   }
 
-  private static Object kernelObjectFrom(Class<?> type) {
+  private static Object objectFrom(Class<?> type) {
     if (type != null) {
       if (String.class.isAssignableFrom(type)) {
         return "mockedKernelData";
@@ -67,6 +66,10 @@ final class TestsUtil {
         return mock(Vpc.class);
       } else if (ISubnet.class.isAssignableFrom(type)) {
         return mock(ISubnet.class);
+      } else if (OAuthScope.class.isAssignableFrom(type)) {
+        return mock(OAuthScope.class);
+      } else if (UserPoolClientIdentityProvider.class.isAssignableFrom(type)) {
+        return mock(UserPoolClientIdentityProvider.class);
       }
       log.warning("unmatched 'type' in kernel response mock");
     }
