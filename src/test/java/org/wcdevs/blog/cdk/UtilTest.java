@@ -1,10 +1,17 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.ZonedDateTime;
 import java.util.UUID;
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 class UtilTest {
   @Test
@@ -29,6 +36,18 @@ class UtilTest {
 
     String sanitized = Util.sanitize(rawValue);
 
-    assertFalse(sanitized.matches(Util.NON_ALPHANUMERIC_VALUES));
+    assertFalse(sanitized.matches(Util.NON_ALPHANUMERIC_VALUES_AND_HYPHEN));
+  }
+
+  @ParameterizedTest
+  @MethodSource("rawAndSanitizedValues")
+  void dbSanitizedShouldCleanProperlyRawValueToBeAValidDBName(String rawValue, String sanitized) {
+    assertEquals(sanitized, Util.dbSanitized(rawValue));
+  }
+
+  static Stream<Arguments> rawAndSanitizedValues() {
+    return Stream.of(arguments("a!s@d#f$g%h^h&jj*aksi^kl(lj)kj_-KL+", "asdfghhjjaksiklljkjKL"),
+                     arguments("!@#~$%^&*()_+[]:;/.,<>\"\\|", "dbName"),
+                     arguments("!S@d#f$g%h^h&jj*aksi^kl(lj)kj_-KL+", "aSdfghhjjaksiklljkjKL"));
   }
 }
