@@ -258,7 +258,7 @@ public final class CognitoStack extends Stack {
 
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
-  public static class InputParameters {
+  public static final class InputParameters {
     String loginPageDomainPrefix;
 
     String applicationName;
@@ -302,7 +302,7 @@ public final class CognitoStack extends Stack {
 
   @Getter
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
-  public static class OutputParameters {
+  public static final class OutputParameters {
     private final String userPoolId;
     private final String userPoolClientId;
     private final String userPoolClientSecret;
