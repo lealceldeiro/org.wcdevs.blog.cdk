@@ -22,7 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-class PostgreSQLTest {
+class DatabaseTest {
   private static String randomString() {
     return UUID.randomUUID().toString();
   }
@@ -82,7 +82,7 @@ class PostgreSQLTest {
   void testNewInstance(List<String> availabilityZones, List<String> isolatedSubnets, String vpc) {
     StaticallyMockedCdk.executeTest(() -> {
       var scope = mock(Construct.class);
-      var inputParam = mock(PostgreSQL.InputParameters.class);
+      var inputParam = mock(Database.InputParameters.class);
       when(inputParam.getInstanceClass()).thenReturn("postgres");
       var appEnvironment = mock(ApplicationEnvironment.class);
       when(appEnvironment.prefixed(any())).thenReturn(randomString());
@@ -111,7 +111,7 @@ class PostgreSQLTest {
         mockedSecretStringGenerator.when(() -> Secret.Builder.create(any(), any()))
                                    .thenReturn(secretBuilderMock);
 
-        assertNotNull(PostgreSQL.newInstance(scope, randomString(), appEnvironment, inputParam));
+        assertNotNull(Database.newInstance(scope, randomString(), appEnvironment, inputParam));
       }
     });
   }
@@ -125,9 +125,9 @@ class PostgreSQLTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      assertEquals(expected, PostgreSQL.getParameter(mock(Construct.class),
-                                                     mock(ApplicationEnvironment.class),
-                                                     randomString()));
+      assertEquals(expected, Database.getParameter(mock(Construct.class),
+                                                   mock(ApplicationEnvironment.class),
+                                                   randomString()));
     }
   }
 
@@ -147,27 +147,27 @@ class PostgreSQLTest {
 
   @Test
   void getDbEndpointAddress() {
-    testGetParameter(PostgreSQL::getDbEndpointAddress);
+    testGetParameter(Database::getDbEndpointAddress);
   }
 
   @Test
   void getDbEndpointPort() {
-    testGetParameter(PostgreSQL::getDbEndpointPort);
+    testGetParameter(Database::getDbEndpointPort);
   }
 
   @Test
   void getDbName() {
-    testGetParameter(PostgreSQL::getDbName);
+    testGetParameter(Database::getDbName);
   }
 
   @Test
   void getDbSecretArn() {
-    testGetParameter(PostgreSQL::getDbSecretArn);
+    testGetParameter(Database::getDbSecretArn);
   }
 
   @Test
   void getDbSecurityGroupId() {
-    testGetParameter(PostgreSQL::getDbSecurityGroupId);
+    testGetParameter(Database::getDbSecurityGroupId);
   }
 
   @Test
@@ -178,8 +178,8 @@ class PostgreSQLTest {
     var dbSecretArn = randomString();
     var dbSecurityGroupId = randomString();
 
-    var expected = new PostgreSQL.OutputParameters(dbEndpointAddress, dbEndpointPort, dbName,
-                                                   dbSecretArn, dbSecurityGroupId);
+    var expected = new Database.OutputParameters(dbEndpointAddress, dbEndpointPort, dbName,
+                                                 dbSecretArn, dbSecurityGroupId);
     var iStringParameter = mock(IStringParameter.class);
     when(iStringParameter.getStringValue()).thenReturn(dbEndpointAddress)
                                            .thenReturn(dbEndpointPort)
@@ -192,8 +192,8 @@ class PostgreSQLTest {
         mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(),
                                                                                  any()))
                              .thenReturn(iStringParameter);
-        assertEquals(expected, PostgreSQL.outputParametersFrom(mock(Construct.class),
-                                                               mock(ApplicationEnvironment.class)));
+        assertEquals(expected, Database.outputParametersFrom(mock(Construct.class),
+                                                             mock(ApplicationEnvironment.class)));
       }
     });
 
@@ -201,22 +201,23 @@ class PostgreSQLTest {
 
   @Test
   void newInputParametersNoArgs() {
-    assertEquals(new PostgreSQL.InputParameters(), PostgreSQL.newInputParameters());
+    assertEquals(new Database.InputParameters(), Database.newInputParameters());
   }
 
   @Test
   void newInputParametersArgs() {
     var storageCapacityInGB = new SecureRandom().nextInt();
     var instanceClass = randomString();
+    var engine = Database.InputParameters.ENGINE_POSTGRES;
     var version = randomString();
-    assertEquals(new PostgreSQL.InputParameters(storageCapacityInGB, instanceClass, version),
-                 PostgreSQL.newInputParameters(storageCapacityInGB, instanceClass, version));
+    assertEquals(new Database.InputParameters(storageCapacityInGB, instanceClass, engine, version),
+                 Database.newInputParameters(storageCapacityInGB, instanceClass, engine, version));
   }
 
   @Test
   void testInputParametersSetStorageCapacity() {
     var storageCapacity = new SecureRandom().nextInt();
-    var inputParams = new PostgreSQL.InputParameters();
+    var inputParams = new Database.InputParameters();
 
     inputParams.setStorageCapacityInGB(storageCapacity);
 
@@ -227,7 +228,7 @@ class PostgreSQLTest {
   @Test
   void testInputParametersSetInstanceClass() {
     var instanceClass = randomString();
-    var inputParams = new PostgreSQL.InputParameters();
+    var inputParams = new Database.InputParameters();
 
     inputParams.setInstanceClass(instanceClass);
 
@@ -235,19 +236,19 @@ class PostgreSQLTest {
   }
 
   @Test
-  void testInputParametersSetPostgresVersion() {
+  void testInputParametersSetEngineVersion() {
     var version = randomString();
-    var inputParams = new PostgreSQL.InputParameters();
+    var inputParams = new Database.InputParameters();
 
-    inputParams.setPostgresVersion(version);
+    inputParams.setEngineVersion(version);
 
-    assertEquals(version, TestsReflectionUtil.getField(inputParams, "postgresVersion"));
+    assertEquals(version, TestsReflectionUtil.getField(inputParams, "engineVersion"));
   }
 
   @Test
   void testInputParametersGetStorageCapacity() {
     var storageCapacity = new SecureRandom().nextInt();
-    var inputParams = new PostgreSQL.InputParameters();
+    var inputParams = new Database.InputParameters();
 
     TestsReflectionUtil.setField(inputParams, "storageCapacityInGB", storageCapacity);
 
@@ -258,7 +259,7 @@ class PostgreSQLTest {
   @Test
   void testInputParametersGetInstanceClass() {
     var instanceClass = randomString();
-    var inputParams = new PostgreSQL.InputParameters();
+    var inputParams = new Database.InputParameters();
 
     TestsReflectionUtil.setField(inputParams, "instanceClass", instanceClass);
 
@@ -266,21 +267,21 @@ class PostgreSQLTest {
   }
 
   @Test
-  void testInputParametersGetPostgresVersion() {
-    var postgresVersion = randomString();
-    var inputParams = new PostgreSQL.InputParameters();
+  void testInputParametersGetEngineVersion() {
+    var engineVersion = randomString();
+    var inputParams = new Database.InputParameters();
 
-    TestsReflectionUtil.setField(inputParams, "postgresVersion", postgresVersion);
+    TestsReflectionUtil.setField(inputParams, "engineVersion", engineVersion);
 
-    assertEquals(postgresVersion, inputParams.getPostgresVersion());
+    assertEquals(engineVersion, inputParams.getEngineVersion());
   }
 
   @Test
   void getDataBasePasswordFromSecret() {
-    testGetDBSecVal(PostgreSQL::getDataBasePasswordFromSecret);
+    testGetDBSecVal(Database::getDataBasePasswordFromSecret);
   }
 
-  void testGetDBSecVal(BiFunction<? super Construct, ? super PostgreSQL.OutputParameters, String> fn) {
+  void testGetDBSecVal(BiFunction<? super Construct, ? super Database.OutputParameters, String> fn) {
     var expected = randomString();
     var secretValueMock = mock(SecretValue.class);
     when(secretValueMock.toString()).thenReturn(expected);
@@ -292,12 +293,12 @@ class PostgreSQLTest {
       mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), any()))
                   .thenReturn(secretMock);
       assertEquals(expected, fn.apply(mock(Construct.class),
-                                      mock(PostgreSQL.OutputParameters.class)));
+                                      mock(Database.OutputParameters.class)));
     }
   }
 
   @Test
   void getDataBaseUsernameFromSecret() {
-    testGetDBSecVal(PostgreSQL::getDataBaseUsernameFromSecret);
+    testGetDBSecVal(Database::getDataBaseUsernameFromSecret);
   }
 }

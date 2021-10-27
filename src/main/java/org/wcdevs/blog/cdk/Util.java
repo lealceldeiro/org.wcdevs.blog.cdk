@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-final class Util {
+public final class Util {
   static final String NON_ALPHANUMERIC_VALUES_AND_HYPHEN = "[^a-zA-Z0-9-]";
   static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9]";
   static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
@@ -12,14 +12,14 @@ final class Util {
   private Util() {
   }
 
-  static String string(Object... values) {
+  public static String string(Object... values) {
     return Arrays.stream(values)
                  .filter(Objects::nonNull)
                  .map(Object::toString)
                  .collect(Collectors.joining());
   }
 
-  static String joinedString(CharSequence joiner, Object... values) {
+  public static String joinedString(CharSequence joiner, Object... values) {
     return Arrays.stream(values)
                  .filter(Objects::nonNull)
                  .map(Object::toString)
@@ -34,7 +34,7 @@ final class Util {
    *
    * @return The sanitized String.
    */
-  static String sanitize(String value) {
+  public static String sanitize(String value) {
     return Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES_AND_HYPHEN, "");
   }
 
@@ -45,7 +45,7 @@ final class Util {
    *
    * @return The sanitized String.
    */
-  static String dbSanitized(String value) {
+  public static String dbSanitized(String value) {
     var alphanumeric = Objects.requireNonNull(value).replaceAll(NON_ALPHANUMERIC_VALUES, "");
     if (alphanumeric.isEmpty()) {
       alphanumeric = "dbName";

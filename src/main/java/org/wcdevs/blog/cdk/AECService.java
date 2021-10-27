@@ -474,7 +474,7 @@ public final class AECService extends Construct {
 
   @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
   @Getter(AccessLevel.PACKAGE)
-  public static class DockerImage {
+  public static final class DockerImage {
     /**
      * Name of an ECR repository.
      */
