@@ -35,6 +35,8 @@
       <name>Asiel Leal Celdeiro</name>
       <id>lealceldeiro</id>
       <email>lealceldeiro@gmail.com</email>
+      <roles><role>Lead Developer</role></roles>
+      <organization>wcDevs</organization>
     </developer>
   </developers>
 
