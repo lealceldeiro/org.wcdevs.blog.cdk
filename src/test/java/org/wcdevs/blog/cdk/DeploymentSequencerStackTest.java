@@ -1,6 +1,8 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.services.lambda.AssetCode;
@@ -25,8 +27,9 @@ class DeploymentSequencerStackTest {
     return UUID.randomUUID().toString();
   }
 
-  @Test
-  void newInstance() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void newInstance(boolean isFifo) {
     StaticallyMockedCdk.executeTest(() -> {
       try (
           var mockedCode = mockStatic(Code.class);
@@ -55,7 +58,7 @@ class DeploymentSequencerStackTest {
 
         var inputParams = mock(DeploymentSequencerStack.InputParameters.class);
         when(inputParams.getQueueName()).thenReturn(randomString());
-        when(inputParams.isFifo()).thenReturn(true);
+        when(inputParams.isFifo()).thenReturn(isFifo);
         when(inputParams.getCodeDirectory()).thenReturn(randomString());
         when(inputParams.getGithubTokenKey()).thenReturn(randomString());
         when(inputParams.getGithubToken()).thenReturn(randomString());

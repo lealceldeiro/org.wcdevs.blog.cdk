@@ -1,15 +1,39 @@
 package org.wcdevs.blog.cdk;
 
+import software.amazon.awscdk.core.App;
+import software.amazon.awscdk.core.Environment;
+
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 public final class Util {
   static final String NON_ALPHANUMERIC_VALUES_AND_HYPHEN = "[^a-zA-Z0-9-]";
-  static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9]";
-  static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
+  private static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9]";
+  private static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
 
   private Util() {
+  }
+
+  public static <T> T getValueInApp(String valueKey, App app) {
+    return getValueInApp(valueKey, app, true);
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T getValueInApp(String valueKey, App app, boolean notNull) {
+    T value = (T) Objects.requireNonNull(app)
+                         .getNode()
+                         .tryGetContext(Objects.requireNonNull(valueKey));
+    return notNull
+           ? Objects.requireNonNull(value, String.format("'%s' cannot be null", valueKey))
+           : value;
+  }
+
+  public static Environment environmentFrom(String accountId, String region) {
+    return Environment.builder()
+                      .account(Objects.requireNonNull(accountId))
+                      .region(Objects.requireNonNull(region))
+                      .build();
   }
 
   public static String string(Object... values) {
@@ -53,5 +77,9 @@ public final class Util {
     return alphanumeric.substring(0, 1).matches(LOWERCASE_LETTERS_ONLY)
            ? alphanumeric
            : "a" + alphanumeric;
+  }
+
+  public static boolean isNotEmptyNotNull(String value) {
+    return value != null && !value.isEmpty() && !"null".equals(value);
   }
 }

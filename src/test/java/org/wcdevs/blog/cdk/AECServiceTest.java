@@ -2,6 +2,9 @@ package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.Fn;
@@ -20,14 +23,17 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -40,54 +46,33 @@ class AECServiceTest {
     return UUID.randomUUID().toString();
   }
 
-  @Test
-  void newInstanceNoHttps() {
-    testNewInstance(randomString(), null, emptyList(), false, emptyMap(), false, emptyList());
+  static Stream<Arguments> newInstanceParameters() {
+    return Stream.of(
+        arguments(randomString(), null, emptyList(), false, emptyMap(), false, emptyList()),
+        arguments(randomString(), randomString(), emptyList(), false, emptyMap(), false,
+                  emptyList()),
+        arguments(randomString(), null, List.of(mock(PolicyStatement.class)), false, emptyMap(),
+                  false, emptyList()),
+        arguments(randomString(), null, emptyList(), true, emptyMap(), false, emptyList()),
+        arguments(randomString(), null, emptyList(), false, emptyMap(), true, emptyList()),
+        arguments(randomString(), null, emptyList(), false, Map.of("k1", "v1"), true, emptyList()),
+        arguments(randomString(), null, emptyList(), false, emptyMap(), false,
+                  List.of(randomString(), randomString()))
+                    );
   }
 
-  @Test
-  void newInstanceWithHttps() {
-    testNewInstance(randomString(), randomString(), emptyList(), false, emptyMap(), false,
-                    emptyList());
-  }
-
-  @Test
-  void newInstanceWithPolicyStatements() {
-    testNewInstance(randomString(), null, List.of(mock(PolicyStatement.class)), false, emptyMap(),
-                    false, emptyList());
-  }
-
-  @Test
-  void newInstanceNoIsEcrSource() {
-    testNewInstance(randomString(), null, emptyList(), true, emptyMap(), false, emptyList());
-  }
-
-  @Test
-  void newInstanceStickySession() {
-    testNewInstance(randomString(), null, emptyList(), false, emptyMap(), true, emptyList());
-  }
-
-  @Test
-  void newInstanceWithEnvVars() {
-    testNewInstance(randomString(), null, emptyList(), false, Map.of("k1", "v1"), true,
-                    emptyList());
-  }
-
-  @Test
-  void newInstanceWithSecGroupIdToAllowAccessFromECS() {
-    testNewInstance(randomString(), null, emptyList(), false, emptyMap(), false,
-                    List.of(randomString(), randomString()));
-  }
-
-  void testNewInstance(String httpListenerArn, String httpsListenerArn,
-                       List<PolicyStatement> taskPolicyStatements, Boolean isEcrSource,
-                       Map<String, String> environmentVars, boolean stickySession,
-                       List<String> securityGroupIdsToGrantIngressFromEcs) {
+  @ParameterizedTest
+  @MethodSource("newInstanceParameters")
+  void newInstance(String httpListenerArn, String httpsListenerArn,
+                   List<PolicyStatement> taskPolicyStatements, Boolean isEcrSource,
+                   Map<String, String> environmentVars, boolean stickySession,
+                   List<String> securityGroupIdsToGrantIngressFromEcs) {
     StaticallyMockedCdk.executeTest(() -> {
       // given
       try (
           var mockedFn = mockStatic(Fn.class);
-          var mockedRepository = mockStatic(Repository.class)
+          var mockedRepository = mockStatic(Repository.class);
+          var ignored = mockStatic(CfnListenerRule.class)
       ) {
         mockedFn.when(() -> Fn.conditionEquals(any(), any()))
                 .thenReturn(mock(ICfnRuleConditionExpression.class));
@@ -195,7 +180,7 @@ class AECServiceTest {
     var dockerImage = mock(AECService.DockerImage.class);
     var inputParameters = new AECService.InputParameters(dockerImage, emptyMap(), emptyList());
 
-    assertEquals(dockerImage, inputParameters.getDockerImage());
+    assertSame(dockerImage, inputParameters.getDockerImage());
   }
 
   @Test
@@ -494,17 +479,25 @@ class AECServiceTest {
 
   @Test
   void testServiceListenerRulesGetHttpRule() {
-    var httpRule = mock(CfnListenerRule.class);
-    var rules = new AECService.ServiceListenerRules(httpRule, mock(CfnListenerRule.class));
+    StaticallyMockedCdk.executeTest(() -> {
+      try (var ignored = mockStatic(CfnListenerRule.class)) {
+        var httpRule = mock(CfnListenerRule.class);
+        var rules = new AECService.ServiceListenerRules(httpRule, mock(CfnListenerRule.class));
 
-    assertEquals(httpRule, rules.getHttpRule());
+        assertEquals(httpRule, rules.getHttpRule());
+      }
+    });
   }
 
   @Test
   void testServiceListenerRulesGetHttpsRule() {
-    var httpsRule = mock(CfnListenerRule.class);
-    var rules = new AECService.ServiceListenerRules(mock(CfnListenerRule.class), httpsRule);
+    StaticallyMockedCdk.executeTest(() -> {
+      try (var ignored = mockStatic(CfnListenerRule.class)) {
+        var httpsRule = mock(CfnListenerRule.class);
+        var rules = new AECService.ServiceListenerRules(mock(CfnListenerRule.class), httpsRule);
 
-    assertEquals(httpsRule, rules.getHttpsRule());
+        assertEquals(httpsRule, rules.getHttpsRule());
+      }
+    });
   }
 }
