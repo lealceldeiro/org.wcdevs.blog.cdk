@@ -3,6 +3,9 @@ package org.wcdevs.blog.cdk;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.services.ecr.Repository;
@@ -12,8 +15,10 @@ import software.amazon.awscdk.services.iam.Grant;
 import java.security.SecureRandom;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -38,24 +43,25 @@ class DockerRepositoryTest {
     when(builderMock.build()).thenReturn(repositoryMock);
   }
 
-  @Test
-  void newInstanceWithDefaults() {
-    testNewInstanceWithParameters(RemovalPolicy.RETAIN, TagMutability.IMMUTABLE);
+  static Stream<Arguments> newInstanceParameters() {
+    return Stream.of(arguments(RemovalPolicy.RETAIN, TagMutability.IMMUTABLE),
+                     arguments(RemovalPolicy.RETAIN, TagMutability.MUTABLE),
+                     arguments(RemovalPolicy.DESTROY, TagMutability.IMMUTABLE),
+                     arguments(RemovalPolicy.DESTROY, TagMutability.MUTABLE));
   }
 
-  @Test
-  void newInstanceWithCustomInputParameters() {
-    testNewInstanceWithParameters(RemovalPolicy.DESTROY, TagMutability.MUTABLE);
-  }
-
-  void testNewInstanceWithParameters(RemovalPolicy removalPolicy, TagMutability tagMutable) {
+  @ParameterizedTest
+  @MethodSource("newInstanceParameters")
+  void newInstanceWithParameters(RemovalPolicy removalPolicy, TagMutability tagMutable) {
     StaticallyMockedCdk.executeTest(() -> {
       try (var mockedBuilder = mockStatic(Repository.Builder.class)) {
         mockedBuilder.when(() -> Repository.Builder.create(any(), any())).thenReturn(builderMock);
 
         var inParams = mock(DockerRepository.InputParameters.class);
         when(inParams.removalPolicy()).thenReturn(removalPolicy);
+        when(inParams.isRetainRegistryOnDelete()).thenReturn(removalPolicy == RemovalPolicy.RETAIN);
         when(inParams.tagMutability()).thenReturn(tagMutable);
+        when(inParams.isInmutableTags()).thenReturn(tagMutable == TagMutability.IMMUTABLE);
         var actual = DockerRepository.newInstance(mock(Construct.class), randomString(), inParams);
         Assertions.assertNotNull(actual);
       }

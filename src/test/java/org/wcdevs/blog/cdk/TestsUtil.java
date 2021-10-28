@@ -6,6 +6,7 @@ import software.amazon.awscdk.services.cognito.OAuthScope;
 import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
 import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.Vpc;
+import software.amazon.awscdk.services.elasticloadbalancingv2.CfnListenerRule;
 import software.amazon.awscdk.services.lambda.Runtime;
 
 import java.util.List;
@@ -73,6 +74,8 @@ final class TestsUtil {
         return mock(UserPoolClientIdentityProvider.class);
       } else if (Runtime.class.isAssignableFrom(type)) {
         return mock(Runtime.class);
+      } else if (CfnListenerRule.class.isAssignableFrom(type)) {
+        return mock(CfnListenerRule.class);
       }
       log.warning("unmatched 'type' in kernel response mock");
     }

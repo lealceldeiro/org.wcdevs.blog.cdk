@@ -4,7 +4,7 @@
 
   <groupId>org.wcdevs.blog</groupId>
   <artifactId>cdk</artifactId>
-  <version>0.0.14-SNAPSHOT</version>
+  <version>1.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>wcDevs.org CDK Constructs</name>
@@ -35,6 +35,8 @@
       <name>Asiel Leal Celdeiro</name>
       <id>lealceldeiro</id>
       <email>lealceldeiro@gmail.com</email>
+      <roles><role>Lead Developer</role></roles>
+      <organization>wcDevs</organization>
     </developer>
   </developers>
 
