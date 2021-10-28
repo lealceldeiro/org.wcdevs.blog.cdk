@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.awscdk.core.App;
+import software.amazon.awscdk.core.ConstructNode;
 
 import java.time.ZonedDateTime;
 import java.util.UUID;
@@ -11,16 +13,24 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class UtilTest {
+
+
   @Test
   void string() {
     String s1 = randomString(), s2 = UUID.randomUUID().toString();
     assertEquals(s1 + s2, Util.string(s1, s2));
   }
 
-  private String randomString() {
+  private static String randomString() {
     return UUID.randomUUID().toString();
   }
 
@@ -49,5 +59,84 @@ class UtilTest {
     return Stream.of(arguments("a!s@d#f$g%h^h&jj*aksi^kl(lj)kj_-KL+", "asdfghhjjaksiklljkjKL"),
                      arguments("!@#~$%^&*()_+[]:;/.,<>\"\\|", "dbName"),
                      arguments("!S@d#f$g%h^h&jj*aksi^kl(lj)kj_-KL+", "aSdfghhjjaksiklljkjKL"));
+  }
+
+  @Test
+  void getValueInAppReturnsNullOK() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var node = mock(ConstructNode.class);
+      var app = mock(App.class);
+      when(app.getNode()).thenReturn(node);
+
+      assertNull(Util.getValueInApp(randomString(), app, false));
+    });
+  }
+
+  @Test
+  void getValueInAppReturnsNotNullOK() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var expected = randomString();
+      var node = mock(ConstructNode.class);
+      when(node.tryGetContext(any())).thenReturn(expected);
+
+      var app = mock(App.class);
+      when(app.getNode()).thenReturn(node);
+
+      assertEquals(expected, Util.getValueInApp(randomString(), app, false));
+    });
+  }
+
+  @Test
+  void getValueInAppRequireNotNullValueReturnsOk() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var expected = randomString();
+      var node = mock(ConstructNode.class);
+      when(node.tryGetContext(any())).thenReturn(expected);
+
+      var app = mock(App.class);
+      when(app.getNode()).thenReturn(node);
+
+      assertEquals(expected, Util.getValueInApp(randomString(), app));
+    });
+  }
+
+  @ParameterizedTest
+  @MethodSource("keyValueMockAppAndReturnedMock")
+  void getValueInAppThrowsNPEIfArgumentIsNull(String valueKey, boolean nullApp, Object expected) {
+    StaticallyMockedCdk.executeTest(() -> {
+      var node = mock(ConstructNode.class);
+      when(node.tryGetContext(any())).thenReturn(expected);
+
+      var app = mock(App.class);
+      when(app.getNode()).thenReturn(node);
+
+      assertThrows(NullPointerException.class,
+                   () -> Util.getValueInApp(valueKey, !nullApp ? app : null));
+    });
+  }
+
+  static Stream<Arguments> keyValueMockAppAndReturnedMock() {
+    return Stream.of(arguments(randomString(), true, randomString()),
+                     arguments(null, false, randomString()),
+                     arguments(randomString(), false, null));
+  }
+
+  @Test
+  void environmentFrom() {
+    StaticallyMockedCdk.executeTest(() -> assertNotNull(Util.environmentFrom(randomString(),
+                                                                             randomString())));
+  }
+
+  @ParameterizedTest
+  @MethodSource("valueAndExpectedForNotEmptyNotNullTest")
+  void notEmptyNotNullReturnsExpected(String value, boolean expected) {
+    assertEquals(expected, Util.isNotEmptyNotNull(value));
+  }
+
+  static Stream<Arguments> valueAndExpectedForNotEmptyNotNullTest() {
+    return Stream.of(arguments(randomString(), true),
+                     arguments(null, false),
+                     arguments("", false),
+                     arguments("null", false));
   }
 }
