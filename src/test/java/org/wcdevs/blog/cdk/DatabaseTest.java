@@ -10,6 +10,7 @@ import software.amazon.awscdk.services.ssm.StringParameter;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.function.BiFunction;
 
@@ -200,80 +201,25 @@ class DatabaseTest {
   }
 
   @Test
-  void newInputParametersNoArgs() {
-    assertEquals(new Database.InputParameters(), Database.newInputParameters());
-  }
+  void testInputParameters() {
+    Random random = new SecureRandom();
 
-  @Test
-  void newInputParametersArgs() {
-    var storageCapacityInGB = new SecureRandom().nextInt();
-    var instanceClass = randomString();
-    var engine = Database.InputParameters.ENGINE_POSTGRES;
-    var version = randomString();
-    assertEquals(new Database.InputParameters(storageCapacityInGB, instanceClass, engine, version),
-                 Database.newInputParameters(storageCapacityInGB, instanceClass, engine, version));
-  }
-
-  @Test
-  void testInputParametersSetStorageCapacity() {
-    var storageCapacity = new SecureRandom().nextInt();
-    var inputParams = new Database.InputParameters();
-
-    inputParams.setStorageCapacityInGB(storageCapacity);
-
-    assertEquals(storageCapacity,
-                 TestsReflectionUtil.<Integer>getField(inputParams, "storageCapacityInGB"));
-  }
-
-  @Test
-  void testInputParametersSetInstanceClass() {
-    var instanceClass = randomString();
-    var inputParams = new Database.InputParameters();
-
-    inputParams.setInstanceClass(instanceClass);
-
-    assertEquals(instanceClass, TestsReflectionUtil.getField(inputParams, "instanceClass"));
-  }
-
-  @Test
-  void testInputParametersSetEngineVersion() {
-    var version = randomString();
-    var inputParams = new Database.InputParameters();
-
-    inputParams.setEngineVersion(version);
-
-    assertEquals(version, TestsReflectionUtil.getField(inputParams, "engineVersion"));
-  }
-
-  @Test
-  void testInputParametersGetStorageCapacity() {
-    var storageCapacity = new SecureRandom().nextInt();
-    var inputParams = new Database.InputParameters();
-
-    TestsReflectionUtil.setField(inputParams, "storageCapacityInGB", storageCapacity);
-
-    assertEquals(storageCapacity, inputParams.getStorageCapacityInGB());
-    assertEquals(String.valueOf(storageCapacity), inputParams.getStorageCapacityInGBString());
-  }
-
-  @Test
-  void testInputParametersGetInstanceClass() {
-    var instanceClass = randomString();
-    var inputParams = new Database.InputParameters();
-
-    TestsReflectionUtil.setField(inputParams, "instanceClass", instanceClass);
-
-    assertEquals(instanceClass, inputParams.getInstanceClass());
-  }
-
-  @Test
-  void testInputParametersGetEngineVersion() {
     var engineVersion = randomString();
-    var inputParams = new Database.InputParameters();
-
-    TestsReflectionUtil.setField(inputParams, "engineVersion", engineVersion);
-
-    assertEquals(engineVersion, inputParams.getEngineVersion());
+    var instanceClass = randomString();
+    var storageCapacityInGB = random.nextInt();
+    var engine = randomString();
+    var input = Database.InputParameters.builder()
+                                        .engineVersion(engineVersion)
+                                        .instanceClass(instanceClass)
+                                        .storageCapacityInGB(storageCapacityInGB)
+                                        .engine(engine)
+                                        .build();
+    assertNotNull(input);
+    assertEquals(engine, input.getEngine());
+    assertEquals(instanceClass, input.getInstanceClass());
+    assertEquals(storageCapacityInGB, input.getStorageCapacityInGB());
+    assertEquals(String.valueOf(storageCapacityInGB), input.getStorageCapacityInGBString());
+    assertEquals(engineVersion, input.getEngineVersion());
   }
 
   @Test
