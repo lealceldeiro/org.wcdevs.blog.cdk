@@ -4,7 +4,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroup;
@@ -34,7 +33,7 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 @Getter(AccessLevel.PACKAGE)
 public final class Database extends Construct {
   // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
-  private static final String TARGET_TYPE_AWS_RDS_DBINSTANCE = "AWS::RDS::DBInstance";
+  private static final String TARGET_TYPE_AWS_RDS_DB_INSTANCE = "AWS::RDS::DBInstance";
   private static final String USERNAME_SECRET_HOLDER = "username";
   private static final String PASSWORD_SECRET_HOLDER = "password";
   private static final String CONSTRUCT_NAME = "Database";
@@ -182,7 +181,7 @@ public final class Database extends Construct {
     return CfnSecretTargetAttachment.Builder.create(scope, "databaseSecretTargetAttachment")
                                             .secretId(dbSecretArn)
                                             .targetId(dbRef)
-                                            .targetType(TARGET_TYPE_AWS_RDS_DBINSTANCE)
+                                            .targetType(TARGET_TYPE_AWS_RDS_DB_INSTANCE)
                                             .build();
   }
 
@@ -281,35 +280,31 @@ public final class Database extends Construct {
   }
   // endregion
 
-  public static InputParameters newInputParameters() {
-    return new InputParameters();
-  }
-
-  public static InputParameters newInputParameters(int storageCapacityInGB, String instanceClass,
-                                                   String engine, String engineVersion) {
-    return new InputParameters(storageCapacityInGB, instanceClass, engine, engineVersion);
-  }
-
   /**
    * Holds the input parameters to build a new {@link Database}.
    */
-  @Setter
   @Getter(AccessLevel.PACKAGE)
-  @AllArgsConstructor(access = AccessLevel.PACKAGE)
-  @NoArgsConstructor(access = AccessLevel.PACKAGE)
-  @EqualsAndHashCode
+  @lombok.Builder
   public static final class InputParameters {
+    // see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html#Concepts.DBInstanceClass.Support
     public static final String ENGINE_POSTGRES = "postgres";
+    // see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html#PostgreSQL.Concepts.General.DBVersions
+    public static final String DEFAULT_ENGINE_VERSION = "12.8";
+    public static final String DEFAULT_INSTANCE_CLASS = "db.t2.micro";
 
+    @lombok.Builder.Default
     private int storageCapacityInGB = 10;
     /**
      * RDB instance type.
      *
      * @see <a href="https://aws.amazon.com/rds/instance-types/">RDB Instance Types</a>
      */
-    private String instanceClass = "db.t2.micro";
+    @lombok.Builder.Default
+    private String instanceClass = DEFAULT_INSTANCE_CLASS;
+    @lombok.Builder.Default
     private String engine = ENGINE_POSTGRES;
-    private String engineVersion = "13.4";
+    @lombok.Builder.Default
+    private String engineVersion = DEFAULT_ENGINE_VERSION;
 
     String getStorageCapacityInGBString() {
       return String.valueOf(storageCapacityInGB);

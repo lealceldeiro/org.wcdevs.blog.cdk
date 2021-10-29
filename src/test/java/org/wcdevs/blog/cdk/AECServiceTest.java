@@ -153,26 +153,19 @@ class AECServiceTest {
     assertNotNull(AECService.newDockerImage(randomString(), randomString(), randomString()));
   }
 
-  @Test
-  void newDockerImageNPEWithNullDockerRepoName() {
-    testNewDockerImageNPE(null, randomString(), randomString());
+  static Stream<Arguments> newDockerImageThrowsIAEIFParamsAreIncorrectArgs() {
+    return Stream.of(arguments(null, null, null),
+                     arguments(null, randomString(), null),
+                     arguments(randomString(), null, null));
   }
 
-  @Test
-  void newDockerImageNPEWithNullDockerImageTag() {
-    testNewDockerImageNPE(randomString(), null, randomString());
-  }
-
-  @Test
-  void newDockerImageNPEWithNullDockerImageUrl() {
-    testNewDockerImageNPE(randomString(), randomString(), null);
-  }
-
-  void testNewDockerImageNPE(String dockerRepositoryName, String dockerImageTag,
-                             String dockerImageUrl) {
+  @ParameterizedTest
+  @MethodSource("newDockerImageThrowsIAEIFParamsAreIncorrectArgs")
+  void newDockerImageThrowsIAEIFParamsAreIncorrect(String dockerRepositoryName,
+                                                   String dockerImageTag, String dockerImageUrl) {
     Executable executable = () -> AECService.newDockerImage(dockerRepositoryName, dockerImageTag,
                                                             dockerImageUrl);
-    assertThrows(NullPointerException.class, executable);
+    assertThrows(IllegalArgumentException.class, executable);
   }
 
   @Test
