@@ -33,7 +33,7 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 @Getter(AccessLevel.PACKAGE)
 public final class Database extends Construct {
   // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
-  private static final String TARGET_TYPE_AWS_RDS_DBINSTANCE = "AWS::RDS::DBInstance";
+  private static final String TARGET_TYPE_AWS_RDS_DB_INSTANCE = "AWS::RDS::DBInstance";
   private static final String USERNAME_SECRET_HOLDER = "username";
   private static final String PASSWORD_SECRET_HOLDER = "password";
   private static final String CONSTRUCT_NAME = "Database";
@@ -181,7 +181,7 @@ public final class Database extends Construct {
     return CfnSecretTargetAttachment.Builder.create(scope, "databaseSecretTargetAttachment")
                                             .secretId(dbSecretArn)
                                             .targetId(dbRef)
-                                            .targetType(TARGET_TYPE_AWS_RDS_DBINSTANCE)
+                                            .targetType(TARGET_TYPE_AWS_RDS_DB_INSTANCE)
                                             .build();
   }
 
