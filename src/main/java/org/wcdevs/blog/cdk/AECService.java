@@ -440,9 +440,12 @@ public final class AECService extends Construct {
 
   public static DockerImage newDockerImage(String dockerRepositoryName, String dockerImageTag,
                                            String dockerImageUrl) {
-    return new DockerImage(Objects.requireNonNull(dockerRepositoryName),
-                           Objects.requireNonNull(dockerImageTag),
-                           Objects.requireNonNull(dockerImageUrl));
+    if ((dockerRepositoryName != null && dockerImageTag != null) || dockerImageUrl != null) {
+      return new DockerImage(dockerRepositoryName, dockerImageTag, dockerImageUrl);
+    }
+    throw new IllegalArgumentException("You need to either specify the docker repository name"
+                                       + " and docker image tag or you need to specify the docker"
+                                       + " image url");
   }
 
   @Getter(AccessLevel.PACKAGE)
