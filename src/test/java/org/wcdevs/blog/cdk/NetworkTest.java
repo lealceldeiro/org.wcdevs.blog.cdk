@@ -2,6 +2,9 @@ package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.ISubnet;
@@ -23,12 +26,13 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
@@ -138,7 +142,7 @@ class NetworkTest {
         mockedStringParameterBuilder.when(() -> StringParameter.Builder.create(any(), any()))
                                     .thenReturn(stringParameterBuilder);
         mockedApplicationLoBalancer.when(() -> ApplicationLoadBalancer.Builder.create(any(), any()))
-                                     .thenReturn(appLoBalancerBuilderMock);
+                                   .thenReturn(appLoBalancerBuilderMock);
         mockedListenerCertificate.when(() -> ListenerCertificate.fromArn(any()))
                                  .thenReturn(sslCertificateMock);
         mockedTags.when(() -> Tags.of(any())).thenReturn(tagsMock);
@@ -172,7 +176,26 @@ class NetworkTest {
     }
   }
 
-  <T> void testGet(BiFunction<? super Construct, ? super String, ? extends String> networkMethod) {
+  static Stream<Arguments> getterReturnsOK() {
+    BiFunction<Construct, String, String> getVPCId = Network::getVPCId,
+        getClusterName = Network::getClusterName,
+        getLoadBalancerSecurityGroupId = Network::getLoadBalancerSecurityGroupId,
+        getLoadBalancerArn = Network::getLoadBalancerArn,
+        getLoadBalancerDnsName = Network::getLoadBalancerDnsName,
+        getLoadBalancerCanonicalHostedZoneId = Network::getLoadBalancerCanonicalHostedZoneId,
+        getHttpListenerArn = Network::getHttpListenerArn,
+        getHttpsListenerArn = Network::getHttpsListenerArn;
+
+    return Stream.of(arguments(getVPCId), arguments(getClusterName),
+                     arguments(getLoadBalancerSecurityGroupId), arguments(getLoadBalancerArn),
+                     arguments(getLoadBalancerDnsName),
+                     arguments(getLoadBalancerCanonicalHostedZoneId), arguments(getHttpListenerArn),
+                     arguments(getHttpsListenerArn));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getterReturnsOK")
+  <T> void getterReturnsOK(BiFunction<? super Construct, ? super String, ? extends String> netFn) {
     var expected = randomString();
 
     var stringParamMock = mock(IStringParameter.class);
@@ -181,48 +204,8 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      assertEquals(expected, networkMethod.apply(mock(Network.class), randomString()));
+      assertEquals(expected, netFn.apply(mock(Network.class), randomString()));
     }
-  }
-
-  @Test
-  void getVPCId() {
-    testGet(Network::getVPCId);
-  }
-
-  @Test
-  void getClusterName() {
-    testGet(Network::getClusterName);
-  }
-
-  @Test
-  void getLoadBalancerSecurityGroupId() {
-    testGet(Network::getLoadBalancerSecurityGroupId);
-  }
-
-  @Test
-  void getLoadBalancerArn() {
-    testGet(Network::getLoadBalancerArn);
-  }
-
-  @Test
-  void getLoadBalancerDnsName() {
-    testGet(Network::getLoadBalancerDnsName);
-  }
-
-  @Test
-  void getLoadBalancerCanonicalHostedZoneId() {
-    testGet(Network::getLoadBalancerCanonicalHostedZoneId);
-  }
-
-  @Test
-  void getHttpListenerArn() {
-    testGet(Network::getHttpListenerArn);
-  }
-
-  @Test
-  void getHttpsListenerArn() {
-    testGet(Network::getHttpsListenerArn);
   }
 
   @Test
@@ -291,114 +274,6 @@ class NetworkTest {
   }
 
   @Test
-  void newInputParametersWithoutCertificate() {
-    Network.InputParameters actual = Network.newInputParameters();
-    assertNotNull(actual);
-    assertNull(actual.getSslCertificateArn());
-  }
-
-  @Test
-  void newInputParametersWithCertificate() {
-    String certificate = randomString();
-    Network.InputParameters actual = Network.newInputParameters(certificate);
-
-    assertNotNull(actual);
-    assertEquals(certificate, actual.getSslCertificateArn());
-  }
-
-  @Test
-  void testSetNatGatewayNumber() {
-    var natNumber = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
-
-    var inputParameters = Network.newInputParameters();
-    inputParameters.setNatGatewayNumber(natNumber);
-
-    assertEquals(natNumber,
-                 TestsReflectionUtil.<Integer>getField(inputParameters, "natGatewayNumber"));
-  }
-
-  @Test
-  void testSetMaxAZs() {
-    var maxAZs = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
-
-    var inputParameters = Network.newInputParameters();
-    inputParameters.setMaxAZs(maxAZs);
-
-    assertEquals(maxAZs, TestsReflectionUtil.<Integer>getField(inputParameters, "maxAZs"));
-  }
-
-  @Test
-  void testSetListeningInternalPort() {
-    var listeningInternalPort = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
-
-    var inputParameters = Network.newInputParameters();
-    inputParameters.setListeningInternalPort(listeningInternalPort);
-
-    assertEquals(listeningInternalPort,
-                 TestsReflectionUtil.<Integer>getField(inputParameters, "listeningInternalPort"));
-  }
-
-  @Test
-  void testSetListeningExternalPort() {
-    var listeningExternalPort = Math.abs(RANDOM.nextInt(RANDOM_UPPER_BOUND));
-
-    var inputParameters = Network.newInputParameters();
-    inputParameters.setListeningExternalPort(listeningExternalPort);
-
-    assertEquals(listeningExternalPort,
-                 TestsReflectionUtil.<Integer>getField(inputParameters, "listeningExternalPort"));
-  }
-
-  @Test
-  void testGetNatGatewayNumber() {
-    var natGatewayNumber = RANDOM.nextInt();
-
-    var inputParameters = Network.newInputParameters();
-    TestsReflectionUtil.setField(inputParameters, "natGatewayNumber", natGatewayNumber);
-
-    assertEquals(natGatewayNumber, inputParameters.getNatGatewayNumber());
-  }
-
-  @Test
-  void testGetMaxAZs() {
-    var maxAZs = RANDOM.nextInt();
-
-    var inputParameters = Network.newInputParameters();
-    TestsReflectionUtil.setField(inputParameters, "maxAZs", maxAZs);
-
-    assertEquals(maxAZs, inputParameters.getMaxAZs());
-  }
-
-  @Test
-  void testGetListeningInternalPort() {
-    var listeningInternalPort = RANDOM.nextInt();
-
-    var inputParameters = Network.newInputParameters();
-    TestsReflectionUtil.setField(inputParameters, "listeningInternalPort", listeningInternalPort);
-
-    assertEquals(listeningInternalPort, inputParameters.getListeningInternalPort());
-  }
-
-  @Test
-  void testGetListeningExternalPort() {
-    var listeningExternalPort = RANDOM.nextInt();
-
-    var inputParameters = Network.newInputParameters();
-    TestsReflectionUtil.setField(inputParameters, "listeningExternalPort", listeningExternalPort);
-
-    assertEquals(listeningExternalPort, inputParameters.getListeningExternalPort());
-  }
-
-  @Test
-  void testGetSslCertificateArn() {
-    var sslCertificateArn = randomString();
-
-    var inputParameters = Network.newInputParameters(sslCertificateArn);
-
-    assertEquals(sslCertificateArn, inputParameters.getSslCertificateArn());
-  }
-
-  @Test
   void outputParametersFromReturnsOKWithDefaults() {
     var stringParamMock = mock(IStringParameter.class);
     String expected = randomString();
@@ -429,24 +304,15 @@ class NetworkTest {
     }
   }
 
-  @Test
-  void outputParametersFromThrowsWithIllegalNumberOfIsolatedSubnetsPerAz() {
-    testOutputParametersFromThrowsWithIllegalArgs(0, 1, 1);
+  static Stream<Arguments> outputParametersFromThrowsWithIllegalArgsArguments() {
+    return Stream.of(arguments(0, 1, 1), arguments(1, 0, 1), arguments(1, 1, 0));
   }
 
-  @Test
-  void outputParametersFromThrowsWithIllegalNumberOfPublicSubnetsPerAz() {
-    testOutputParametersFromThrowsWithIllegalArgs(1, 0, 1);
-  }
-
-  @Test
-  void outputParametersFromThrowsWithIllegalTotalAvailabilityZones() {
-    testOutputParametersFromThrowsWithIllegalArgs(1, 1, 0);
-  }
-
-  void testOutputParametersFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAz,
-                                                     int numberOfPublicSubnetsPerAz,
-                                                     int totalAvailabilityZones) {
+  @ParameterizedTest
+  @MethodSource("outputParametersFromThrowsWithIllegalArgsArguments")
+  void outputParametersFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAz,
+                                                 int numberOfPublicSubnetsPerAz,
+                                                 int totalAvailabilityZones) {
     Executable executable = () -> Network.outputParametersFrom(mock(Construct.class),
                                                                randomString(),
                                                                numberOfIsolatedSubnetsPerAz,
@@ -455,33 +321,50 @@ class NetworkTest {
     assertThrows(IllegalArgumentException.class, executable);
   }
 
-  @Test
-  void vpcFromWithIllegalNumberOfIsolatedSubnetsPerAZ() {
-    testVpcFromThrowsWithIllegalArgs(0, 1, 1, 1);
+
+  static Stream<Arguments> vpcFromThrowsWithIllegalArgsArguments() {
+    return Stream.of(arguments(1, 1, 0), arguments(1, 0, 1), arguments(0, 1, 1));
   }
 
-  @Test
-  void vpcFromWithIllegalNumberOfPublicSubnetsPerAZ() {
-    testVpcFromThrowsWithIllegalArgs(1, 0, 1, 1);
-  }
-
-  @Test
-  void vpcFromWithIllegalMaxAZs() {
-    testVpcFromThrowsWithIllegalArgs(1, 1, 1, 0);
-  }
-
-  @Test
-  void vpcFromWithIllegalNatGatewayNumber() {
-    testVpcFromThrowsWithIllegalArgs(1, 1, 0, 1);
-  }
-
-  void testVpcFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAZ,
-                                        int numberOfPublicSubnetsPerAZ,
-                                        int natGatewayNumber,
-                                        int maxAZs) {
+  @ParameterizedTest
+  @MethodSource("vpcFromThrowsWithIllegalArgsArguments")
+  void vpcFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAZ,
+                                    int numberOfPublicSubnetsPerAZ,
+                                    int maxAZs) {
+    var nat = new SecureRandom().nextInt();
     Executable executable = () -> testNewInstance(randomString(), numberOfIsolatedSubnetsPerAZ,
-                                                  numberOfPublicSubnetsPerAZ, natGatewayNumber,
-                                                  maxAZs);
+                                                  numberOfPublicSubnetsPerAZ, nat, maxAZs);
     assertThrows(IllegalArgumentException.class, executable);
+  }
+
+  @Test
+  void testInputParameters() {
+    Random random = new SecureRandom();
+
+    var sslCertificateArn = randomString();
+    var natGatewayNumber = random.nextInt();
+    var numberOfIsolatedSubnetsPerAZ = random.nextInt();
+    var numberOfPublicSubnetsPerAZ = random.nextInt();
+    var maxAZs = random.nextInt();
+    var listeningExternalPort = random.nextInt();
+    var listeningInternalPort = random.nextInt();
+    var input = Network.InputParameters.builder()
+                                       .sslCertificateArn(sslCertificateArn)
+                                       .natGatewayNumber(natGatewayNumber)
+                                       .numberOfIsolatedSubnetsPerAZ(numberOfIsolatedSubnetsPerAZ)
+                                       .numberOfPublicSubnetsPerAZ(numberOfPublicSubnetsPerAZ)
+                                       .maxAZs(maxAZs)
+                                       .listeningExternalPort(listeningExternalPort)
+                                       .listeningInternalPort(listeningInternalPort)
+                                       .build();
+
+    assertNotNull(input);
+    assertEquals(sslCertificateArn, input.getSslCertificateArn());
+    assertEquals(natGatewayNumber, input.getNatGatewayNumber());
+    assertEquals(numberOfIsolatedSubnetsPerAZ, input.getNumberOfIsolatedSubnetsPerAZ());
+    assertEquals(numberOfPublicSubnetsPerAZ, input.getNumberOfPublicSubnetsPerAZ());
+    assertEquals(maxAZs, input.getMaxAZs());
+    assertEquals(listeningExternalPort, input.getListeningExternalPort());
+    assertEquals(listeningInternalPort, input.getListeningInternalPort());
   }
 }
