@@ -50,7 +50,6 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
  * </p>
  *
  * @see Network#newInstance(Construct, String, String, InputParameters)
- * @see Network#newInputParameters(String)
  * @see Network#outputParametersFrom(Construct, String)
  */
 @Setter(AccessLevel.PRIVATE)
@@ -165,10 +164,8 @@ public final class Network extends Construct {
   private static IVpc vpcFrom(Construct scope, String environmentName, int natGatewayNumber,
                               int numberOfIsolatedSubnetsPerAZ, int numberOfPublicSubnetsPerAZ,
                               int maxAZs) {
-    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || natGatewayNumber < 1
-        || maxAZs < 1) {
-      String err = "The number of private/public subnets, AZs and natGatewayNumber must be >= 1";
-      throw new IllegalArgumentException(err);
+    if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || maxAZs < 1) {
+      throw new IllegalArgumentException("Number of private/public subnets and AZs must be >= 1");
     }
 
     var isolatedSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, "isolatedSubnet");
@@ -396,29 +393,6 @@ public final class Network extends Construct {
   }
   // endregion
 
-  // region newInputParameters
-
-  /**
-   * Creates a new {@link InputParameters}.
-   *
-   * @return The newly created {@link InputParameters}.
-   */
-  public static InputParameters newInputParameters() {
-    return new InputParameters();
-  }
-
-  /**
-   * Creates a new {@link InputParameters} from a given ssl certificate.
-   *
-   * @param sslCertificate SSL Certificate.
-   *
-   * @return The newly created {@link InputParameters}.
-   */
-  public static InputParameters newInputParameters(String sslCertificate) {
-    return new InputParameters(sslCertificate);
-  }
-  // endregion
-
   // region output parameters
 
   /**
@@ -492,25 +466,22 @@ public final class Network extends Construct {
   /**
    * Holds the input parameters to build a new {@link Network}.
    */
+  @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
-  @Setter(AccessLevel.PACKAGE)
   public static final class InputParameters {
-    private final String sslCertificateArn;
+    private String sslCertificateArn;
 
     private int natGatewayNumber;
+    @lombok.Builder.Default
     private int numberOfIsolatedSubnetsPerAZ = DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ;
+    @lombok.Builder.Default
     private int numberOfPublicSubnetsPerAZ = DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ;
+    @lombok.Builder.Default
     private int maxAZs = DEFAULT_NUMBER_OF_AZ;
+    @lombok.Builder.Default
     private int listeningInternalPort = 8080;
+    @lombok.Builder.Default
     private int listeningExternalPort = 80;
-
-    InputParameters() {
-      this.sslCertificateArn = null;
-    }
-
-    InputParameters(String sslCertificateArn) {
-      this.sslCertificateArn = sslCertificateArn;
-    }
   }
 
   /**
