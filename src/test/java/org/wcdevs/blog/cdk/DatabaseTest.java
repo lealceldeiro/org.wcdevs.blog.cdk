@@ -223,29 +223,15 @@ class DatabaseTest {
   }
 
   @Test
-  void getDataBasePasswordFromSecret() {
-    testGetDBSecVal(Database::getDataBasePasswordFromSecret);
-  }
-
-  void testGetDBSecVal(BiFunction<? super Construct, ? super Database.OutputParameters, String> fn) {
-    var expected = randomString();
-    var secretValueMock = mock(SecretValue.class);
-    when(secretValueMock.toString()).thenReturn(expected);
-
-    var secretMock = mock(ISecret.class);
-    when(secretMock.secretValueFromJson(any())).thenReturn(secretValueMock);
+  void getDataBaseSecret() {
+    var expected = mock(ISecret.class);
 
     try (var mockedSecret = mockStatic(Secret.class)) {
       mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), any()))
-                  .thenReturn(secretMock);
+                  .thenReturn(expected);
       var output = mock(Database.OutputParameters.class);
       when(output.getDbSecretArn()).thenReturn(randomString());
-      assertEquals(expected, fn.apply(mock(Construct.class), output));
+      assertEquals(expected, Database.getDataBaseSecret(mock(Construct.class), output));
     }
-  }
-
-  @Test
-  void getDataBaseUsernameFromSecret() {
-    testGetDBSecVal(Database::getDataBaseUsernameFromSecret);
   }
 }

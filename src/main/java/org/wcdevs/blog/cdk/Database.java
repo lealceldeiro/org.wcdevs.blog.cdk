@@ -10,6 +10,7 @@ import software.amazon.awscdk.services.ec2.CfnSecurityGroup;
 import software.amazon.awscdk.services.rds.CfnDBInstance;
 import software.amazon.awscdk.services.rds.CfnDBSubnetGroup;
 import software.amazon.awscdk.services.secretsmanager.CfnSecretTargetAttachment;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
 import software.amazon.awscdk.services.ssm.StringParameter;
@@ -34,8 +35,6 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 public final class Database extends Construct {
   // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
   private static final String TARGET_TYPE_AWS_RDS_DB_INSTANCE = "AWS::RDS::DBInstance";
-  private static final String USERNAME_SECRET_HOLDER = "username";
-  private static final String PASSWORD_SECRET_HOLDER = "password";
   private static final String CONSTRUCT_NAME = "Database";
   private static final String DASH_JOINER = "-";
   private static final String PARAM_ENDPOINT_ADDRESS = "endpointAddress";
@@ -44,6 +43,9 @@ public final class Database extends Construct {
   private static final String PARAM_SECURITY_GROUP_ID = "securityGroupId";
   private static final String PARAM_SECRET_ARN = "secretArn";
   private static final String DATABASE_SECRET = "databaseSecret";
+
+  public static final String USERNAME_SECRET_HOLDER = "username";
+  public static final String PASSWORD_SECRET_HOLDER = "password";
 
   private CfnSecurityGroup dbSecurityGroup;
   private Secret dbSecret;
@@ -214,21 +216,10 @@ public final class Database extends Construct {
   // endregion
 
   // region output parameters
-  public static String getDataBasePasswordFromSecret(Construct scope,
-                                                     OutputParameters outputParameters) {
-    return getDataBaseSecretValue(scope, outputParameters, PASSWORD_SECRET_HOLDER);
-  }
 
-  public static String getDataBaseUsernameFromSecret(Construct scope,
-                                                     OutputParameters outputParameters) {
-    return getDataBaseSecretValue(scope, outputParameters, USERNAME_SECRET_HOLDER);
-  }
-
-  private static String getDataBaseSecretValue(Construct scope, OutputParameters outParams,
-                                               String secretValueToRetrieve) {
+  public static ISecret getDataBaseSecret(Construct scope, OutputParameters outParams) {
     return Secret.fromSecretCompleteArn(scope, DATABASE_SECRET,
-                                        Objects.requireNonNull(outParams.getDbSecretArn()))
-                 .secretValueFromJson(Objects.requireNonNull(secretValueToRetrieve)).toString();
+                                        Objects.requireNonNull(outParams.getDbSecretArn()));
   }
 
   public static String getParameter(Construct scope, ApplicationEnvironment appEnvironment,
