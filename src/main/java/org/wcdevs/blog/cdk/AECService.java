@@ -68,7 +68,7 @@ import static java.util.Collections.emptyList;
  * @see Network#outputParametersFrom(Construct, String)
  */
 public final class AECService extends Construct {
-  private static final String AWS_SERVICE_ECS_TASKS_AMAZON_COM = "ecs-tasks.amazon.com";
+  private static final String ECS_TASKS_AMAZONAWS_PRINCIPAL = "ecs-tasks.amazonaws.com";
 
   private static final String NETWORK_MODE_AWS_VPC = "awsvpc";
   private static final String LUNCH_TYPE_FARGATE = "FARGATE";
@@ -246,7 +246,7 @@ public final class AECService extends Construct {
     var policies = Map.of(appEnv.prefixed("ecsTaskExecutionRolePolicy"), policyDocument);
 
     return Role.Builder.create(scope, "ecsTaskExecutionRole")
-                       .assumedBy(ServicePrincipal.Builder.create(AWS_SERVICE_ECS_TASKS_AMAZON_COM)
+                       .assumedBy(ServicePrincipal.Builder.create(ECS_TASKS_AMAZONAWS_PRINCIPAL)
                                                           .build())
                        .path("/")
                        .inlinePolicies(policies)
@@ -255,7 +255,7 @@ public final class AECService extends Construct {
 
   private static Role ecsTaskRole(Construct scope, ApplicationEnvironment appEnv,
                                   AECService.InputParameters params) {
-    var iamPrincipal = ServicePrincipal.Builder.create(AWS_SERVICE_ECS_TASKS_AMAZON_COM).build();
+    var iamPrincipal = ServicePrincipal.Builder.create(ECS_TASKS_AMAZONAWS_PRINCIPAL).build();
     var roleBuilder = Role.Builder.create(scope, "ecsTaskRole").assumedBy(iamPrincipal).path("/");
 
     var taskRolePolicyStatements = params.getTaskRolePolicyStatements();
