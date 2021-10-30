@@ -226,8 +226,9 @@ public final class Database extends Construct {
 
   private static String getDataBaseSecretValue(Construct scope, OutputParameters outParams,
                                                String secretValueToRetrieve) {
-    return Secret.fromSecretCompleteArn(scope, DATABASE_SECRET, outParams.getDbSecretArn())
-                 .secretValueFromJson(secretValueToRetrieve).toString();
+    return Secret.fromSecretCompleteArn(scope, DATABASE_SECRET,
+                                        Objects.requireNonNull(outParams.getDbSecretArn()))
+                 .secretValueFromJson(Objects.requireNonNull(secretValueToRetrieve)).toString();
   }
 
   public static String getParameter(Construct scope, ApplicationEnvironment appEnvironment,

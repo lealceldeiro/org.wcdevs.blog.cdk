@@ -238,8 +238,9 @@ class DatabaseTest {
     try (var mockedSecret = mockStatic(Secret.class)) {
       mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), any()))
                   .thenReturn(secretMock);
-      assertEquals(expected, fn.apply(mock(Construct.class),
-                                      mock(Database.OutputParameters.class)));
+      var output = mock(Database.OutputParameters.class);
+      when(output.getDbSecretArn()).thenReturn(randomString());
+      assertEquals(expected, fn.apply(mock(Construct.class), output));
     }
   }
 
