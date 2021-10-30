@@ -7,7 +7,7 @@
   <version>1.0.3-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>wcDevs.org CDK Constructs</name>
+  <name>wcDevs.org AWS CDK Constructs</name>
   <description>A collection of CDK constructs to deploy wcDevs Blog on AWS.</description>
   <url>https://github.com/lealceldeiro/org.wcdevs.blog.cdk</url>
 
