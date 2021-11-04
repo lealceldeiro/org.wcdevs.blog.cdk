@@ -62,12 +62,12 @@ import static java.util.Collections.emptyList;
  *   </li>
  * </ul>
  *
- * @see AECService#newInstance(Construct, String, Environment, ApplicationEnvironment, InputParameters, Network.OutputParameters)
- * @see AECService#newDockerImage(String, String, String)
- * @see AECService#newInputParameters(DockerImage, Map, List)
+ * @see ElasticContainerService#newInstance(Construct, String, Environment, ApplicationEnvironment, InputParameters, Network.OutputParameters)
+ * @see ElasticContainerService#newDockerImage(String, String, String)
+ * @see ElasticContainerService#newInputParameters(DockerImage, Map, List)
  * @see Network#outputParametersFrom(Construct, String)
  */
-public final class AECService extends Construct {
+public final class ElasticContainerService extends Construct {
   private static final String ECS_TASKS_AMAZONAWS_PRINCIPAL = "ecs-tasks.amazonaws.com";
 
   private static final String NETWORK_MODE_AWS_VPC = "awsvpc";
@@ -101,53 +101,55 @@ public final class AECService extends Construct {
   private static final int HTTP_LISTENER_RULE_FORWARD_PATH_PRIORITY = 3;
   private static final int HTTPS_LISTENER_RULE_FORWARD_PATH_PRIORITY = 5;
 
-  private AECService(Construct scope, String id) {
+  private ElasticContainerService(Construct scope, String id) {
     super(scope, id);
   }
 
-  public static AECService newInstance(Construct scope, String id, Environment awsEnvironment,
-                                       ApplicationEnvironment applicationEnvironment,
-                                       InputParameters inputParameters,
-                                       Network.OutputParameters networkOutputParameters) {
+  public static ElasticContainerService newInstance(Construct scope, String id,
+                                                    Environment awsEnvironment,
+                                                    ApplicationEnvironment applicationEnvironment,
+                                                    InputParameters inputParameters,
+                                                    Network.OutputParameters networkOutputParams) {
     var inParameters = Objects.requireNonNull(inputParameters);
-    var netOutputParameters = Objects.requireNonNull(networkOutputParameters);
+    var netOutputParams = Objects.requireNonNull(networkOutputParams);
     var appEnv = Objects.requireNonNull(applicationEnvironment);
 
-    var aECService = new AECService(Objects.requireNonNull(scope), Objects.requireNonNull(id));
+    var eCService = new ElasticContainerService(Objects.requireNonNull(scope),
+                                                 Objects.requireNonNull(id));
 
-    var targetGroup = targetGroup(aECService, inParameters, netOutputParameters);
-    var serviceHttpListenerRules = httpListenerRules(aECService, targetGroup, netOutputParameters);
+    var targetGroup = targetGroup(eCService, inParameters, netOutputParams);
+    var serviceHttpListenerRules = httpListenerRules(eCService, targetGroup, netOutputParams);
 
-    var logGroup = LogGroup.Builder.create(aECService, "ecsLogGroup")
+    var logGroup = LogGroup.Builder.create(eCService, "ecsLogGroup")
                                    .logGroupName(applicationEnvironment.prefixed("logs"))
                                    .retention(inParameters.getLogRetention())
                                    .removalPolicy(RemovalPolicy.DESTROY)
                                    .build();
 
-    var ecsTaskExecutionRole = ecsTaskExecutionRole(aECService, appEnv);
-    var ecsTaskRole = ecsTaskRole(aECService, appEnv, inParameters);
+    var ecsTaskExecutionRole = ecsTaskExecutionRole(eCService, appEnv);
+    var ecsTaskRole = ecsTaskRole(eCService, appEnv, inParameters);
 
-    var dockerImageUrl = dockerImageRepositoryUrl(aECService, inParameters, ecsTaskExecutionRole);
+    var dockerImageUrl = dockerImageRepositoryUrl(eCService, inParameters, ecsTaskExecutionRole);
 
     var containerDefProperty = containerDefinitionProperty(Objects.requireNonNull(awsEnvironment),
                                                            logGroup, appEnv, inParameters,
                                                            dockerImageUrl);
 
-    var taskDefinition = taskDefinition(aECService, inParameters, ecsTaskExecutionRole, ecsTaskRole,
+    var taskDefinition = taskDefinition(eCService, inParameters, ecsTaskExecutionRole, ecsTaskRole,
                                         containerDefProperty);
 
-    var ecsSecurityGroup = ecsSecurityGroup(aECService, inParameters, netOutputParameters);
+    var ecsSecurityGroup = ecsSecurityGroup(eCService, inParameters, netOutputParams);
 
-    var cfnService = cfnService(aECService, taskDefinition, targetGroup, ecsSecurityGroup, appEnv,
-                                inParameters, netOutputParameters);
+    var cfnService = cfnService(eCService, taskDefinition, targetGroup, ecsSecurityGroup, appEnv,
+                                inParameters, netOutputParams);
     // https://stackoverflow.com/q/61250772/5640649
     cfnService.addDependsOn(serviceHttpListenerRules.getHttpRule());
 
-    return aECService;
+    return eCService;
   }
 
   // region helpers
-  private static CfnTargetGroup targetGroup(AECService scope, InputParameters params,
+  private static CfnTargetGroup targetGroup(ElasticContainerService scope, InputParameters params,
                                             Network.OutputParameters netOutputParameters) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
     return CfnTargetGroup.Builder.create(scope, "targetGroup")
@@ -254,7 +256,7 @@ public final class AECService extends Construct {
   }
 
   private static Role ecsTaskRole(Construct scope, ApplicationEnvironment appEnv,
-                                  AECService.InputParameters params) {
+                                  ElasticContainerService.InputParameters params) {
     var iamPrincipal = ServicePrincipal.Builder.create(ECS_TASKS_AMAZONAWS_PRINCIPAL).build();
     var roleBuilder = Role.Builder.create(scope, "ecsTaskRole").assumedBy(iamPrincipal).path("/");
 
@@ -322,7 +324,7 @@ public final class AECService extends Construct {
       Map<String, String> source
                                                                                               ) {
     return source.entrySet().stream()
-                 .map(AECService::cfnTaskDefKeyValuePropertyFrom)
+                 .map(ElasticContainerService::cfnTaskDefKeyValuePropertyFrom)
                  .collect(Collectors.toList());
   }
 
