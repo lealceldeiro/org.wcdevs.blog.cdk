@@ -3,6 +3,7 @@ package org.wcdevs.blog.cdk;
 import org.junit.jupiter.api.Test;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.SecretValue;
+import software.amazon.awscdk.services.rds.StorageType;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
@@ -85,6 +86,7 @@ class DatabaseTest {
       var scope = mock(Construct.class);
       var inputParam = mock(Database.InputParameters.class);
       when(inputParam.getInstanceClass()).thenReturn("postgres");
+      when(inputParam.getStorageType()).thenReturn(mock(StorageType.class));
       var appEnvironment = mock(ApplicationEnvironment.class);
       when(appEnvironment.prefixed(any())).thenReturn(randomString());
       var netOutputParamsMock = mock(Network.OutputParameters.class);
@@ -208,11 +210,28 @@ class DatabaseTest {
     var instanceClass = randomString();
     var storageCapacityInGB = random.nextInt();
     var engine = randomString();
+    var publiclyAccessible = random.nextBoolean();
+    var protectedAgainstDeletion = random.nextBoolean();
+    var minorVersionAutoUpgradeEnabled = random.nextBoolean();
+    var performanceInsightsEnabled = random.nextBoolean();
+    var encryptionEnabled = random.nextBoolean();
+    var port = random.nextInt();
+    var backUpRetentionPeriod = random.nextInt();
+    var deleteAutomatedBackupsEnabled = random.nextBoolean();
     var input = Database.InputParameters.builder()
                                         .engineVersion(engineVersion)
                                         .instanceClass(instanceClass)
                                         .storageCapacityInGB(storageCapacityInGB)
                                         .engine(engine)
+                                        .publiclyAccessible(publiclyAccessible)
+                                        .protectedAgainstDeletion(protectedAgainstDeletion)
+                                        .minorVersionAutoUpgradeEnabled(minorVersionAutoUpgradeEnabled)
+                                        .performanceInsightsEnabled(performanceInsightsEnabled)
+                                        .encryptionEnabled(encryptionEnabled)
+                                        .portNumber(port)
+                                        .storageType(StorageType.GP2)
+                                        .backUpRetentionPeriodInDays(backUpRetentionPeriod)
+                                        .deleteAutomatedBackupsEnabled(deleteAutomatedBackupsEnabled)
                                         .build();
     assertNotNull(input);
     assertEquals(engine, input.getEngine());
@@ -220,6 +239,16 @@ class DatabaseTest {
     assertEquals(storageCapacityInGB, input.getStorageCapacityInGB());
     assertEquals(String.valueOf(storageCapacityInGB), input.getStorageCapacityInGBString());
     assertEquals(engineVersion, input.getEngineVersion());
+    assertEquals(publiclyAccessible, input.isPubliclyAccessible());
+    assertEquals(protectedAgainstDeletion, input.isProtectedAgainstDeletion());
+    assertEquals(minorVersionAutoUpgradeEnabled, input.isMinorVersionAutoUpgradeEnabled());
+    assertEquals(performanceInsightsEnabled, input.isPerformanceInsightsEnabled());
+    assertEquals(encryptionEnabled, input.isEncryptionEnabled());
+    assertEquals(port, input.getPortNumber());
+    assertEquals(String.valueOf(port), input.getPort());
+    assertEquals(StorageType.GP2, input.getStorageType());
+    assertEquals(backUpRetentionPeriod, input.getBackUpRetentionPeriodInDays());
+    assertEquals(deleteAutomatedBackupsEnabled, input.isDeleteAutomatedBackupsEnabled());
   }
 
   @Test
