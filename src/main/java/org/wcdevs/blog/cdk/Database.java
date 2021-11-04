@@ -9,6 +9,7 @@ import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroup;
 import software.amazon.awscdk.services.rds.CfnDBInstance;
 import software.amazon.awscdk.services.rds.CfnDBSubnetGroup;
+import software.amazon.awscdk.services.rds.StorageType;
 import software.amazon.awscdk.services.secretsmanager.CfnSecretTargetAttachment;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
@@ -104,7 +105,7 @@ public final class Database extends Construct {
     var dbName = Util.dbSanitized(applicationEnvironment.prefixed("database"));
     var dbPassword = dbSecret.secretValueFromJson(PASSWORD_SECRET_HOLDER).toString();
     var dbInstance = dbInstance(database, inParams, availabilityZones.get(0), subnetGroupName,
-                                dbName, username, dbPassword, secGroup.getAttrGroupId(), false);
+                                dbName, username, dbPassword, secGroup.getAttrGroupId());
     database.setDbInstance(dbInstance);
 
     cfnSecretTargetAttachment(database, dbSecret.getSecretArn(), dbInstance.getRef());
@@ -156,23 +157,31 @@ public final class Database extends Construct {
                                    .build();
   }
 
-  private static CfnDBInstance dbInstance(Construct scope, InputParameters inputParameters,
+  private static CfnDBInstance dbInstance(Construct scope, InputParameters inParams,
                                           String availabilityZone, String subnetGroupName,
                                           String dbName, String dbUsername, String dbPassword,
-                                          String securityGroupId, boolean publiclyAccessible) {
+                                          String securityGroupId) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
     return CfnDBInstance.Builder.create(scope, "databaseInstance")
-                                .allocatedStorage(inputParameters.getStorageCapacityInGBString())
+                                .allocatedStorage(inParams.getStorageCapacityInGBString())
                                 .availabilityZone(availabilityZone)
-                                .dbInstanceClass(inputParameters.getInstanceClass())
+                                .dbInstanceClass(inParams.getInstanceClass())
                                 .dbName(dbName)
                                 .dbSubnetGroupName(subnetGroupName)
-                                .engine(inputParameters.getEngine())
-                                .engineVersion(inputParameters.getEngineVersion())
+                                .engine(inParams.getEngine())
+                                .engineVersion(inParams.getEngineVersion())
                                 .masterUsername(dbUsername)
                                 .masterUserPassword(dbPassword)
-                                .publiclyAccessible(publiclyAccessible)
+                                .publiclyAccessible(inParams.isPubliclyAccessible())
                                 .vpcSecurityGroups(List.of(securityGroupId))
+                                .deletionProtection(inParams.isProtectedAgainstDeletion())
+                                .autoMinorVersionUpgrade(inParams.isMinorVersionAutoUpgradeEnabled())
+                                .enablePerformanceInsights(inParams.isPerformanceInsightsEnabled())
+                                .storageEncrypted(inParams.isEncryptionEnabled())
+                                .port(inParams.getPort())
+                                .storageType(inParams.getStorageType().name())
+                                .backupRetentionPeriod(inParams.getBackUpRetentionPeriodInDays())
+                                .deleteAutomatedBackups(inParams.isDeleteAutomatedBackupsEnabled())
                                 .build();
   }
 
@@ -283,6 +292,12 @@ public final class Database extends Construct {
     // see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html#PostgreSQL.Concepts.General.DBVersions
     public static final String DEFAULT_ENGINE_VERSION = "12.8";
     public static final String DEFAULT_INSTANCE_CLASS = "db.t2.micro";
+    // see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html
+    public static final StorageType SSD = StorageType.GP2;
+    public static final StorageType MAGNETIC = StorageType.STANDARD;
+    public static final StorageType PROVISIONED_IOPS = StorageType.IO1;
+
+    private static final StorageType DEFAULT_STORAGE_TYPE = SSD;
 
     @lombok.Builder.Default
     private int storageCapacityInGB = 10;
@@ -297,9 +312,36 @@ public final class Database extends Construct {
     private String engine = ENGINE_POSTGRES;
     @lombok.Builder.Default
     private String engineVersion = DEFAULT_ENGINE_VERSION;
+    private boolean publiclyAccessible;
+    private boolean protectedAgainstDeletion;
+    @lombok.Builder.Default
+    private boolean minorVersionAutoUpgradeEnabled = true;
+    private boolean performanceInsightsEnabled;
+    private boolean encryptionEnabled;
+    @lombok.Builder.Default
+    private int portNumber = 5432;
+    @lombok.Builder.Default
+    private StorageType storageType = DEFAULT_STORAGE_TYPE;
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html#cfn-rds-dbinstance-backupretentionperiod
+    @lombok.Builder.Default
+    private Number backUpRetentionPeriodInDays = 1;
+    // https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html
+    @lombok.Builder.Default
+    private boolean deleteAutomatedBackupsEnabled = true;
 
+    /**
+     * Gets the initial storage capacity of the DB.
+     *
+     * @return A string representing the number in GB for the storage capacity to use for the DB.
+     *
+     * @see <a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html#cfn-rds-dbinstance-allocatedstorage">AWS::RDS::DBInstance.AllocatedStorage</a>
+     */
     String getStorageCapacityInGBString() {
       return String.valueOf(storageCapacityInGB);
+    }
+
+    String getPort() {
+      return String.valueOf(portNumber);
     }
   }
 

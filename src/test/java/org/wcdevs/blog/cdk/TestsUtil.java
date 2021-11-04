@@ -1,13 +1,6 @@
 package org.wcdevs.blog.cdk;
 
 import org.mockito.invocation.InvocationOnMock;
-import software.amazon.awscdk.core.ICfnResourceOptions;
-import software.amazon.awscdk.services.cognito.OAuthScope;
-import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
-import software.amazon.awscdk.services.ec2.ISubnet;
-import software.amazon.awscdk.services.ec2.Vpc;
-import software.amazon.awscdk.services.elasticloadbalancingv2.CfnListenerRule;
-import software.amazon.awscdk.services.lambda.Runtime;
 
 import java.util.List;
 import java.util.Map;
@@ -59,27 +52,6 @@ final class TestsUtil {
   }
 
   private static Object objectFrom(Class<?> type) {
-    if (type != null) {
-      if (String.class.isAssignableFrom(type)) {
-        return "mockedKernelData";
-      } else if (ICfnResourceOptions.class.isAssignableFrom(type)) {
-        return mock(ICfnResourceOptions.class);
-      } else if (Vpc.class.isAssignableFrom(type)) {
-        return mock(Vpc.class);
-      } else if (ISubnet.class.isAssignableFrom(type)) {
-        return mock(ISubnet.class);
-      } else if (OAuthScope.class.isAssignableFrom(type)) {
-        return mock(OAuthScope.class);
-      } else if (UserPoolClientIdentityProvider.class.isAssignableFrom(type)) {
-        return mock(UserPoolClientIdentityProvider.class);
-      } else if (Runtime.class.isAssignableFrom(type)) {
-        return mock(Runtime.class);
-      } else if (CfnListenerRule.class.isAssignableFrom(type)) {
-        return mock(CfnListenerRule.class);
-      }
-      log.warning("unmatched 'type' in kernel response mock");
-    }
-    log.warning("'type' and 'elementType' are null");
-    return "defaultMockedKernelData";
+    return type == null || String.class.isAssignableFrom(type) ? "mockedKernelData" : mock(type);
   }
 }

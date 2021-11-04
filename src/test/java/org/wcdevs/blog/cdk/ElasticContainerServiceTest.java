@@ -39,7 +39,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-class AECServiceTest {
+class ElasticContainerServiceTest {
   private static final Random RANDOM = new SecureRandom();
 
   private static String randomString() {
@@ -90,13 +90,13 @@ class AECServiceTest {
         var appEnv = mock(ApplicationEnvironment.class);
         when(appEnv.prefixed(any())).thenReturn(randomString());
 
-        var dockerImageMock = mock(AECService.DockerImage.class);
+        var dockerImageMock = mock(ElasticContainerService.DockerImage.class);
         when(dockerImageMock.isEcrSource()).thenReturn(isEcrSource);
         when(dockerImageMock.getDockerRepositoryName()).thenReturn(randomString());
         when(dockerImageMock.getDockerImageTag()).thenReturn(randomString());
         when(dockerImageMock.getDockerImageUrl()).thenReturn(randomString());
 
-        var inputParams = mock(AECService.InputParameters.class);
+        var inputParams = mock(ElasticContainerService.InputParameters.class);
         when(inputParams.getTaskRolePolicyStatements()).thenReturn(taskPolicyStatements);
         when(inputParams.getDockerImage()).thenReturn(dockerImageMock);
         when(inputParams.getAwsLogsDateTimeFormat()).thenReturn(randomString());
@@ -111,8 +111,8 @@ class AECServiceTest {
         when(netOutParams.getHttpListenerArn()).thenReturn(httpListenerArn);
 
         // when
-        var actual = AECService.newInstance(scope, id, awsEnvironment, appEnv, inputParams,
-                                            netOutParams);
+        var actual = ElasticContainerService.newInstance(scope, id, awsEnvironment, appEnv,
+                                                         inputParams, netOutParams);
         // then
         assertNotNull(actual);
       }
@@ -121,8 +121,8 @@ class AECServiceTest {
 
   @Test
   void newInputParametersOK() {
-    assertNotNull(AECService.newInputParameters(mock(AECService.DockerImage.class),
-                                                Map.of("k1", "v1"), List.of("id1")));
+    assertNotNull(ElasticContainerService.newInputParameters(mock(ElasticContainerService.DockerImage.class),
+                                                             Map.of("k1", "v1"), List.of("id1")));
   }
 
   @Test
@@ -132,25 +132,25 @@ class AECServiceTest {
 
   @Test
   void newInputParametersNPEForNullEnvironmentVariables() {
-    testNewInputParametersNPE(mock(AECService.DockerImage.class), null, List.of("id1"));
+    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class), null, List.of("id1"));
   }
 
   @Test
   void newInputParametersNPEForNullListOfGroupIds() {
-    testNewInputParametersNPE(mock(AECService.DockerImage.class), Map.of("k1", "v1"), null);
+    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class), Map.of("k1", "v1"), null);
   }
 
-  void testNewInputParametersNPE(AECService.DockerImage dockerImage,
+  void testNewInputParametersNPE(ElasticContainerService.DockerImage dockerImage,
                                  Map<String, String> environmentVariables,
                                  List<String> secGroupIdsToGrantIngressFromEcs) {
-    Executable executable = () -> AECService.newInputParameters(dockerImage, environmentVariables,
-                                                                secGroupIdsToGrantIngressFromEcs);
+    Executable executable = () -> ElasticContainerService.newInputParameters(dockerImage, environmentVariables,
+                                                                             secGroupIdsToGrantIngressFromEcs);
     assertThrows(NullPointerException.class, executable);
   }
 
   @Test
   void newDockerImageOK() {
-    assertNotNull(AECService.newDockerImage(randomString(), randomString(), randomString()));
+    assertNotNull(ElasticContainerService.newDockerImage(randomString(), randomString(), randomString()));
   }
 
   static Stream<Arguments> newDockerImageThrowsIAEIFParamsAreIncorrectArgs() {
@@ -163,15 +163,16 @@ class AECServiceTest {
   @MethodSource("newDockerImageThrowsIAEIFParamsAreIncorrectArgs")
   void newDockerImageThrowsIAEIFParamsAreIncorrect(String dockerRepositoryName,
                                                    String dockerImageTag, String dockerImageUrl) {
-    Executable executable = () -> AECService.newDockerImage(dockerRepositoryName, dockerImageTag,
-                                                            dockerImageUrl);
+    Executable executable = () -> ElasticContainerService.newDockerImage(dockerRepositoryName,
+                                                                         dockerImageTag,
+                                                                         dockerImageUrl);
     assertThrows(IllegalArgumentException.class, executable);
   }
 
   @Test
   void testInputParameterGetDockerImage() {
-    var dockerImage = mock(AECService.DockerImage.class);
-    var inputParameters = new AECService.InputParameters(dockerImage, emptyMap(), emptyList());
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(), emptyList());
 
     assertSame(dockerImage, inputParameters.getDockerImage());
   }
@@ -179,8 +180,8 @@ class AECServiceTest {
   @Test
   void testInputParameterGetEnvironmentVariables() {
     var environmentVariables = Map.of(randomString(), randomString());
-    var inputParameters = new AECService.InputParameters(mock(AECService.DockerImage.class),
-                                                         environmentVariables, emptyList());
+    var inputParameters = new ElasticContainerService.InputParameters(mock(ElasticContainerService.DockerImage.class),
+                                                                      environmentVariables, emptyList());
 
     assertEquals(environmentVariables, inputParameters.getEnvironmentVariables());
   }
@@ -188,9 +189,9 @@ class AECServiceTest {
   @Test
   void testInputParameterGetSecGroupIdsToGrantIngressFromEcs() {
     List<String> secGroupIdsToGrantIngressFromEcs = emptyList();
-    var inputParameters = new AECService.InputParameters(mock(AECService.DockerImage.class),
-                                                         emptyMap(),
-                                                         secGroupIdsToGrantIngressFromEcs);
+    var inputParameters = new ElasticContainerService.InputParameters(mock(ElasticContainerService.DockerImage.class),
+                                                                      emptyMap(),
+                                                                      secGroupIdsToGrantIngressFromEcs);
 
     assertEquals(secGroupIdsToGrantIngressFromEcs,
                  inputParameters.getSecurityGroupIdsToGrantIngressFromEcs());
@@ -199,112 +200,113 @@ class AECServiceTest {
   @Test
   void testInputParameterGetTaskRolePolicyStatements() {
     testInputParameterGet("taskRolePolicyStatements", List.of(mock(PolicyStatement.class)),
-                          AECService.InputParameters::getTaskRolePolicyStatements);
+                          ElasticContainerService.InputParameters::getTaskRolePolicyStatements);
   }
 
   <T> void testInputParameterGet(String fieldName, T expected,
-                                 Function<? super AECService.InputParameters, T> mapper) {
-    var inputParameters = new AECService.InputParameters(mock(AECService.DockerImage.class),
-                                                         emptyMap(), emptyList());
+                                 Function<? super ElasticContainerService.InputParameters, T> map) {
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(),
+                                                                      emptyList());
     TestsReflectionUtil.setField(inputParameters, fieldName, expected);
 
-    assertEquals(expected, mapper.apply(inputParameters));
+    assertEquals(expected, map.apply(inputParameters));
   }
 
   @Test
   void testInputParameterGetHealthCheckIntervalSeconds() {
     testInputParameterGet("healthCheckIntervalSeconds", RANDOM.nextInt(),
-                          AECService.InputParameters::getHealthCheckIntervalSeconds);
+                          ElasticContainerService.InputParameters::getHealthCheckIntervalSeconds);
   }
 
   @Test
   void testInputParameterGetHealthCheckPath() {
     testInputParameterGet("healthCheckPath", randomString(),
-                          AECService.InputParameters::getHealthCheckPath);
+                          ElasticContainerService.InputParameters::getHealthCheckPath);
   }
 
   @Test
   void testInputParameterGetContainerPort() {
     testInputParameterGet("containerPort", RANDOM.nextInt(),
-                          AECService.InputParameters::getContainerPort);
+                          ElasticContainerService.InputParameters::getContainerPort);
   }
 
   @Test
   void testInputParameterGetContainerProtocol() {
     testInputParameterGet("containerProtocol", randomString(),
-                          AECService.InputParameters::getContainerProtocol);
+                          ElasticContainerService.InputParameters::getContainerProtocol);
   }
 
   @Test
   void testInputParameterGetHealthCheckTimeoutSeconds() {
     testInputParameterGet("healthCheckTimeoutSeconds", RANDOM.nextInt(),
-                          AECService.InputParameters::getHealthCheckTimeoutSeconds);
+                          ElasticContainerService.InputParameters::getHealthCheckTimeoutSeconds);
   }
 
   @Test
   void testInputParameterGetHealthyThresholdCount() {
     testInputParameterGet("healthyThresholdCount", RANDOM.nextInt(),
-                          AECService.InputParameters::getHealthyThresholdCount);
+                          ElasticContainerService.InputParameters::getHealthyThresholdCount);
   }
 
   @Test
   void testInputParameterGetUnhealthyThresholdCount() {
     testInputParameterGet("unhealthyThresholdCount", RANDOM.nextInt(),
-                          AECService.InputParameters::getUnhealthyThresholdCount);
+                          ElasticContainerService.InputParameters::getUnhealthyThresholdCount);
   }
 
   @Test
   void testInputParameterGetLogRetention() {
     testInputParameterGet("logRetention", RetentionDays.FIVE_DAYS,
-                          AECService.InputParameters::getLogRetention);
+                          ElasticContainerService.InputParameters::getLogRetention);
   }
 
   @Test
   void testInputParameterGetCpu() {
     testInputParameterGet("cpu", RANDOM.nextInt(),
-                          AECService.InputParameters::getCpu);
+                          ElasticContainerService.InputParameters::getCpu);
   }
 
   @Test
   void testInputParameterGetMemory() {
     testInputParameterGet("memory", RANDOM.nextInt(),
-                          AECService.InputParameters::getMemory);
+                          ElasticContainerService.InputParameters::getMemory);
   }
 
   @Test
   void testInputParameterGetDesiredInstancesCount() {
     testInputParameterGet("desiredInstancesCount", RANDOM.nextInt(),
-                          AECService.InputParameters::getDesiredInstancesCount);
+                          ElasticContainerService.InputParameters::getDesiredInstancesCount);
   }
 
   @Test
   void testInputParameterGetMaximumInstancesPercent() {
     testInputParameterGet("maximumInstancesPercent", RANDOM.nextInt(),
-                          AECService.InputParameters::getMaximumInstancesPercent);
+                          ElasticContainerService.InputParameters::getMaximumInstancesPercent);
   }
 
   @Test
   void testInputParameterGetMinimumHealthyInstancesPercent() {
     testInputParameterGet("minimumHealthyInstancesPercent", RANDOM.nextInt(),
-                          AECService.InputParameters::getMinimumHealthyInstancesPercent);
+                          ElasticContainerService.InputParameters::getMinimumHealthyInstancesPercent);
   }
 
   @Test
   void testInputParameterGetStickySessionsEnabled() {
     testInputParameterGet("stickySessionsEnabled", RANDOM.nextBoolean(),
-                          AECService.InputParameters::isStickySessionsEnabled);
+                          ElasticContainerService.InputParameters::isStickySessionsEnabled);
   }
 
   @Test
   void testInputParameterGetStickySessionsCookieDuration() {
     testInputParameterGet("stickySessionsCookieDuration", RANDOM.nextInt(),
-                          AECService.InputParameters::getStickySessionsCookieDuration);
+                          ElasticContainerService.InputParameters::getStickySessionsCookieDuration);
   }
 
   @Test
   void testInputParameterGetAwsLogsDateTimeFormat() {
     testInputParameterGet("awsLogsDateTimeFormat", randomString(),
-                          AECService.InputParameters::getAwsLogsDateTimeFormat);
+                          ElasticContainerService.InputParameters::getAwsLogsDateTimeFormat);
   }
 
   @Test
@@ -315,10 +317,11 @@ class AECServiceTest {
   }
 
   <T> void testInputParameterSet(String fieldName, T expected,
-                                 Consumer<? super AECService.InputParameters> consumer) {
-    var inputParameters = new AECService.InputParameters(mock(AECService.DockerImage.class),
-                                                         emptyMap(), emptyList());
-    consumer.accept(inputParameters);
+                                 Consumer<? super ElasticContainerService.InputParameters> cons) {
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(),
+                                                                      emptyList());
+    cons.accept(inputParameters);
     assertEquals(expected, TestsReflectionUtil.getField(inputParameters, fieldName));
   }
 
@@ -437,7 +440,7 @@ class AECServiceTest {
   @Test
   void testDockerImageGetDockerRepositoryName() {
     var expected = randomString();
-    var dockerImage = new AECService.DockerImage(expected, randomString(), randomString());
+    var dockerImage = new ElasticContainerService.DockerImage(expected, randomString(), randomString());
 
     assertEquals(expected, dockerImage.getDockerRepositoryName());
   }
@@ -445,7 +448,7 @@ class AECServiceTest {
   @Test
   void testDockerImageGetDockerImageTag() {
     var expected = randomString();
-    var dockerImage = new AECService.DockerImage(randomString(), expected, randomString());
+    var dockerImage = new ElasticContainerService.DockerImage(randomString(), expected, randomString());
 
     assertEquals(expected, dockerImage.getDockerImageTag());
   }
@@ -453,20 +456,20 @@ class AECServiceTest {
   @Test
   void testDockerImageGetDockerImageUrl() {
     var expected = randomString();
-    var dockerImage = new AECService.DockerImage(randomString(), randomString(), expected);
+    var dockerImage = new ElasticContainerService.DockerImage(randomString(), randomString(), expected);
 
     assertEquals(expected, dockerImage.getDockerImageUrl());
   }
 
   @Test
   void dockerImageIsEcrSourceReturnsTrueIfDockerRepositoryNameIsNotNull() {
-    assertTrue(new AECService.DockerImage(randomString(), randomString(), randomString())
+    assertTrue(new ElasticContainerService.DockerImage(randomString(), randomString(), randomString())
                    .isEcrSource());
   }
 
   @Test
   void dockerImageIsEcrSourceReturnsFalseIfDockerRepositoryNameIsNotNull() {
-    assertFalse(new AECService.DockerImage(null, randomString(), randomString())
+    assertFalse(new ElasticContainerService.DockerImage(null, randomString(), randomString())
                     .isEcrSource());
   }
 
@@ -475,7 +478,7 @@ class AECServiceTest {
     StaticallyMockedCdk.executeTest(() -> {
       try (var ignored = mockStatic(CfnListenerRule.class)) {
         var httpRule = mock(CfnListenerRule.class);
-        var rules = new AECService.ServiceListenerRules(httpRule, mock(CfnListenerRule.class));
+        var rules = new ElasticContainerService.ServiceListenerRules(httpRule, mock(CfnListenerRule.class));
 
         assertEquals(httpRule, rules.getHttpRule());
       }
@@ -487,7 +490,7 @@ class AECServiceTest {
     StaticallyMockedCdk.executeTest(() -> {
       try (var ignored = mockStatic(CfnListenerRule.class)) {
         var httpsRule = mock(CfnListenerRule.class);
-        var rules = new AECService.ServiceListenerRules(mock(CfnListenerRule.class), httpsRule);
+        var rules = new ElasticContainerService.ServiceListenerRules(mock(CfnListenerRule.class), httpsRule);
 
         assertEquals(httpsRule, rules.getHttpsRule());
       }
