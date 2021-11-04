@@ -52,13 +52,6 @@ final class TestsUtil {
   }
 
   private static Object objectFrom(Class<?> type) {
-    if (type != null) {
-      if (String.class.isAssignableFrom(type)) {
-        return "mockedKernelData";
-      }
-      return mock(type);
-    }
-    log.warning("'type' and 'elementType' are null");
-    return "defaultMockedKernelData";
+    return type == null || String.class.isAssignableFrom(type) ? "mockedKernelData" : mock(type);
   }
 }
