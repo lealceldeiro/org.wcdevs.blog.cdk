@@ -35,8 +35,9 @@ public final class DeploymentSequencerStack extends Stack {
                                                      InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
 
+    var stackName = Util.joinedString("-", applicationName, "deployments", "stack");
     var stackProps = StackProps.builder()
-                               .stackName(applicationName + "-Deployments")
+                               .stackName(stackName)
                                .env(awsEnvironment)
                                .build();
     var stack = new DeploymentSequencerStack(scope, id, stackProps);

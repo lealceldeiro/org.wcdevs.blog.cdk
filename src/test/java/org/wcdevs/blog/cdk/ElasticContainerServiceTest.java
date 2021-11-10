@@ -248,6 +248,17 @@ class ElasticContainerServiceTest {
   }
 
   @Test
+  void testInputParameterGetHealthCheckPortString() {
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(),
+                                                                      emptyList());
+    var intValue = RANDOM.nextInt();
+    TestsReflectionUtil.setField(inputParameters, "healthCheckPort", intValue);
+
+    assertEquals(String.valueOf(intValue), inputParameters.getHealthCheckPortString());
+  }
+
+  @Test
   void testInputParameterGetApplicationProtocol() {
     testInputParameterGet("applicationProtocol", randomString(),
                           ElasticContainerService.InputParameters::getApplicationProtocol);
@@ -425,7 +436,7 @@ class ElasticContainerServiceTest {
   }
 
   @Test
-  void testInputParameterSetMmory() {
+  void testInputParameterSetMemory() {
     var expected = RANDOM.nextInt();
     testInputParameterSet("memory", expected,
                           input -> input.setMemory(expected));
