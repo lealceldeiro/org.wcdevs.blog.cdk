@@ -2,6 +2,7 @@ package org.wcdevs.blog.cdk;
 
 import software.amazon.awscdk.core.App;
 import software.amazon.awscdk.core.Environment;
+import software.amazon.awscdk.core.IConstruct;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -27,6 +28,15 @@ public final class Util {
     return notNull
            ? Objects.requireNonNull(value, String.format("'%s' cannot be null", valueKey))
            : value;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T getValueOrDefault(String valueKey, IConstruct app, T defaultValue) {
+    if (Objects.isNull(valueKey) || Objects.isNull(app) || Objects.isNull(app.getNode())) {
+      return defaultValue;
+    }
+    var value = app.getNode().tryGetContext(valueKey);
+    return Objects.nonNull(value) ? (T) value : defaultValue;
   }
 
   public static Environment environmentFrom(String accountId, String region) {

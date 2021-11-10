@@ -237,7 +237,8 @@ public final class Network extends Construct {
     httpListener.addTargetGroups("http", appTargetGroupProps);
 
     IApplicationListener httpsListener = null;
-    if (sslCertificateArn != null) {
+    if (Objects.nonNull(sslCertificateArn) &&
+        !NULL_HTTPS_LISTENER_ARN_VALUE.equals(sslCertificateArn)) {
       var certificate = ListenerCertificate.fromArn(sslCertificateArn);
       var httpsListenerProps
           = BaseApplicationListenerProps.builder()

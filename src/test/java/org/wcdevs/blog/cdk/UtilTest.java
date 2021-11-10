@@ -72,6 +72,41 @@ class UtilTest {
     });
   }
 
+  private static Stream<Arguments> getValueOrDefaultReturnsOKForNotNullDefaultArgs() {
+    return Stream.of(arguments(null, false, false, false),
+                     arguments(randomString(), true, false, false),
+                     arguments(randomString(), false, true, false),
+                     arguments(randomString(), false, false, true),
+                     arguments(randomString(), false, false, false));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getValueOrDefaultReturnsOKForNotNullDefaultArgs")
+  void getValueOrDefaultReturnsOKForNotNullDefault(String key, boolean nullApp,
+                                                   boolean nullNode, boolean nullValue) {
+    StaticallyMockedCdk.executeTest(() -> {
+      var appWithNullNode = mock(App.class);
+
+      var node = nullNode ? null : mock(ConstructNode.class);
+      var appWithNullValue = mock(App.class);
+      when(appWithNullValue.getNode()).thenReturn(node);
+
+      var nodeValue = randomString();
+      var nodeWithValue = nullNode ? null : mock(ConstructNode.class);
+      if (!nullNode) {
+        when(nodeWithValue.tryGetContext(any())).thenReturn(nodeValue);
+      }
+      var appWithValue = mock(App.class);
+      when(appWithValue.getNode()).thenReturn(nodeWithValue);
+
+      var app = nullNode ? appWithNullNode : (nullValue ? appWithNullValue : appWithValue);
+
+      var expected = !nullApp && !nullNode && !nullValue ? nodeValue : randomString();
+      var actual = Util.getValueOrDefault(key, nullApp ? null : app, expected);
+      assertEquals(expected, actual);
+    });
+  }
+
   @Test
   void getValueInAppReturnsNotNullOK() {
     StaticallyMockedCdk.executeTest(() -> {
