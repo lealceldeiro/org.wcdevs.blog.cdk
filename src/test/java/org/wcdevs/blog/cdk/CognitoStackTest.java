@@ -1,6 +1,7 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
+import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.customresources.AwsCustomResourcePolicy;
@@ -13,7 +14,6 @@ import software.amazon.awscdk.services.cognito.OAuthSettings;
 import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
-import software.constructs.Construct;
 
 import java.util.UUID;
 
@@ -105,7 +105,7 @@ class CognitoStackTest {
       assertEquals(expected, actual.getProviderUrl());
       assertEquals(expected, actual.getUserPoolClientId());
       assertEquals(expected, actual.getUserPoolId());
-      assertEquals(expected, actual.getUserPoolClientSecret());
+      assertEquals(expected, actual.getUserPoolClientSecretArn());
     }
   }
 

@@ -3,6 +3,7 @@ package org.wcdevs.blog.cdk;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.Stack;
@@ -28,8 +29,10 @@ import software.amazon.awscdk.services.cognito.UserPool;
 import software.amazon.awscdk.services.cognito.UserPoolClient;
 import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
 import software.amazon.awscdk.services.cognito.UserPoolDomain;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
+import software.amazon.awscdk.services.secretsmanager.Secret;
+import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
 import software.amazon.awscdk.services.ssm.StringParameter;
-import software.constructs.Construct;
 
 import java.util.Collection;
 import java.util.List;
@@ -45,12 +48,15 @@ import static software.amazon.awscdk.customresources.AwsCustomResourcePolicy.ANY
 public final class CognitoStack extends Stack {
   private static final String PARAM_USER_POOL_ID = "userPoolId";
   private static final String PARAM_USER_POOL_CLIENT_ID = "userPoolClientId";
-  private static final String PARAM_USER_POOL_CLIENT_SECRET = "userPoolClientSecret";
+  private static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
+  private static final String USER_POOL_CLIENT_SECRET = "userPoolClientSecret";
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
   private static final String CONSTRUCT_NAME = "cognito";
   private static final String DASH_JOINER = "-";
+
+  public static final String USER_POOL_CLIENT_SECRET_HOLDER = "userPoolClientSecretValue";
 
   private CognitoStack(Construct scope, String id, StackProps props) {
     super(scope, id, props);
@@ -75,21 +81,28 @@ public final class CognitoStack extends Stack {
 
     createUserPoolDomain(cognitoStack, userPool, inParams);
 
+    var secretName = applicationEnvironment.prefixed(USER_POOL_CLIENT_SECRET);
     var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
-                                                    userPoolClient.getUserPoolClientId());
+                                                    userPoolClient.getUserPoolClientId(),
+                                                    secretName);
 
     createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_ID,
                           userPool.getUserPoolId());
     createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID,
                           userPoolClient.getUserPoolClientId());
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_CLIENT_SECRET,
-                          userPoolClientSecret);
+    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_CLIENT_SECRET_ARN,
+                          userPoolClientSecret.getSecretArn());
     createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_LOGOUT_URL,
                           logoutUrl);
     createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_PROVIDER_URL,
                           userPool.getUserPoolProviderUrl());
 
     return cognitoStack;
+  }
+
+  public static ISecret getUserPoolClientSecret(Construct scope, OutputParameters outParams) {
+    var arn = Objects.requireNonNull(outParams.getUserPoolClientSecretArn());
+    return Secret.fromSecretCompleteArn(scope, USER_POOL_CLIENT_SECRET, arn);
   }
 
   // region helpers
@@ -182,50 +195,6 @@ public final class CognitoStack extends Stack {
     return joinedString(DASH_JOINER, appEnv.getEnvironmentName(), appEnv.getApplicationName(),
                         CONSTRUCT_NAME, parameterName);
   }
-  // endregion
-
-  // region get output params
-  public static OutputParameters getOutputParameters(Construct scope,
-                                                     ApplicationEnvironment appEnvironment) {
-    return new OutputParameters(getParameterUserPoolId(scope, appEnvironment),
-                                getParameterUserPoolClientId(scope, appEnvironment),
-                                getParameterUserPoolClientSecret(scope, appEnvironment),
-                                getParameterLogoutUrl(scope, appEnvironment),
-                                getParameterUserPoolProviderUrl(scope, appEnvironment));
-  }
-
-  public static String getParameter(Construct scope, ApplicationEnvironment applicationEnvironment,
-                                    String id) {
-    return StringParameter.fromStringParameterName(scope, id,
-                                                   createParameterName(applicationEnvironment, id))
-                          .getStringValue();
-  }
-
-  public static String getParameterUserPoolId(Construct scope,
-                                              ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_ID);
-  }
-
-  public static String getParameterUserPoolClientId(Construct scope,
-                                                    ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID);
-  }
-
-  public static String getParameterUserPoolClientSecret(Construct scope,
-                                                        ApplicationEnvironment appEnvironment) {
-    return getParameter(scope, appEnvironment, PARAM_USER_POOL_CLIENT_SECRET);
-  }
-
-  public static String getParameterLogoutUrl(Construct scope,
-                                             ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_LOGOUT_URL);
-  }
-
-  public static String getParameterUserPoolProviderUrl(Construct scope,
-                                                       ApplicationEnvironment appEnvironment) {
-    return getParameter(scope, appEnvironment, PARAM_USER_POOL_PROVIDER_URL);
-  }
-  // endregion
 
   @SafeVarargs
   private static <T> List<T> join(Collection<? extends T> additional, T... elements) {
@@ -234,8 +203,24 @@ public final class CognitoStack extends Stack {
                  .collect(toList());
   }
 
-  private static String userPoolClientSecret(Construct scope, String awsRegion, String userPoolId,
-                                             String userPoolClientId) {
+  private static Secret userPoolClientSecret(Construct scope, String awsRegion, String userPoolId,
+                                             String userPoolClientId, String secretName) {
+    var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
+                                                              userPoolClientId);
+    var secretTemplate = String.format("{\"%s\":\"%s\"}", USER_POOL_CLIENT_SECRET_HOLDER,
+                                       userPoolClientSecretValue);
+    var secretString = SecretStringGenerator.builder()
+                                            .secretStringTemplate(secretTemplate)
+                                            .build();
+    return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET)
+                         .secretName(secretName)
+                         .description("User pool client secret")
+                         .generateSecretString(secretString)
+                         .build();
+  }
+
+  private static String userPoolClientSecretValue(Construct scope, String awsRegion,
+                                                  String userPoolId, String userPoolClientId) {
     // The UserPoolClient secret, can't be accessed directly
     // This custom resource will call the AWS API to get the secret,
     // See: https://github.com/aws/aws-cdk/issues/7225
@@ -262,6 +247,50 @@ public final class CognitoStack extends Stack {
                                                     .build();
     return userPoolResource.getResponseField("UserPoolClient.ClientSecret");
   }
+  // endregion
+
+  // region get output params
+  public static OutputParameters getOutputParameters(Construct scope,
+                                                     ApplicationEnvironment appEnvironment) {
+    return new OutputParameters(getParameterUserPoolId(scope, appEnvironment),
+                                getParameterUserPoolClientId(scope, appEnvironment),
+                                getParameterUserPoolClientSecretArn(scope, appEnvironment),
+                                getParameterLogoutUrl(scope, appEnvironment),
+                                getParameterUserPoolProviderUrl(scope, appEnvironment));
+  }
+
+  public static String getParameter(Construct scope, ApplicationEnvironment applicationEnvironment,
+                                    String id) {
+    return StringParameter.fromStringParameterName(scope, id,
+                                                   createParameterName(applicationEnvironment, id))
+                          .getStringValue();
+  }
+
+  public static String getParameterUserPoolId(Construct scope,
+                                              ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_ID);
+  }
+
+  public static String getParameterUserPoolClientId(Construct scope,
+                                                    ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID);
+  }
+
+  public static String getParameterUserPoolClientSecretArn(Construct scope,
+                                                           ApplicationEnvironment appEnvironment) {
+    return getParameter(scope, appEnvironment, PARAM_USER_POOL_CLIENT_SECRET_ARN);
+  }
+
+  public static String getParameterLogoutUrl(Construct scope,
+                                             ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_LOGOUT_URL);
+  }
+
+  public static String getParameterUserPoolProviderUrl(Construct scope,
+                                                       ApplicationEnvironment appEnvironment) {
+    return getParameter(scope, appEnvironment, PARAM_USER_POOL_PROVIDER_URL);
+  }
+  // endregion
 
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
@@ -333,7 +362,7 @@ public final class CognitoStack extends Stack {
   public static final class OutputParameters {
     private final String userPoolId;
     private final String userPoolClientId;
-    private final String userPoolClientSecret;
+    private final String userPoolClientSecretArn;
     private final String logoutUrl;
     private final String providerUrl;
   }
