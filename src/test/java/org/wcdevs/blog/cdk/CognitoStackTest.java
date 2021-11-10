@@ -120,6 +120,9 @@ class CognitoStackTest {
     assertFalse(input.isSignInAutoVerifyEmail());
     assertTrue(input.isSignInAliasUsername());
     assertTrue(input.isSignInAliasEmail());
+    assertFalse(input.isSignInAliasPhone());
+    assertFalse(input.isSignInPhoneRequired());
+    assertFalse(input.isSignInPhoneMutable());
     assertTrue(input.isSignInCaseSensitive());
     assertTrue(input.isSignInEmailRequired());
     assertFalse(input.isSignInEmailMutable());
@@ -133,13 +136,19 @@ class CognitoStackTest {
     assertTrue(input.isUserPoolGenerateSecret());
     assertTrue(input.getUserPoolSuppoertedIdentityProviders().isEmpty());
     assertTrue(input.getUserPoolOauthCallBackUrls().isEmpty());
+
     assertEquals(CognitoStack.InputParameters.DEFAULT_COGNITO_LOGOUT_URL_TPL,
                  input.getCognitoLogoutUrlTemplate());
-
     var region = randomString();
     var expectedLogoutUrl = String.format(input.getCognitoLogoutUrlTemplate(),
                                           input.getLoginPageDomainPrefix(),
                                           region);
     assertEquals(expectedLogoutUrl, input.getFullLogoutUrlForRegion(region));
+
+    assertEquals(CognitoStack.InputParameters.DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE,
+                 input.getCognitoOauthLoginUrlTemplate());
+    var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
+                                         input.getApplicationUrl());
+    assertEquals(expectedLoginUrl, input.getAppLoginUrl());
   }
 }

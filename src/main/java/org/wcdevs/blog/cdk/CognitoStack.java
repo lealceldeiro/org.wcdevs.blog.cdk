@@ -100,13 +100,20 @@ public final class CognitoStack extends Stack {
     var signInAliases = SignInAliases.builder()
                                      .username(inParams.isSignInAliasUsername())
                                      .email(inParams.isSignInAliasEmail())
+                                     .phone(inParams.isSignInAliasPhone())
                                      .build();
     var signInEmailAttributes = StandardAttribute.builder()
                                                  .required(inParams.isSignInEmailRequired())
                                                  .mutable(inParams.isSignInEmailMutable())
                                                  .build();
+    var signInPhoneAttributes = StandardAttribute.builder()
+                                                 .required(inParams.isSignInPhoneRequired())
+                                                 .mutable(inParams.isSignInPhoneMutable())
+                                                 .build();
     var signInAttributes = StandardAttributes.builder()
-                                             .email(signInEmailAttributes).build();
+                                             .email(signInEmailAttributes)
+                                             .phoneNumber(signInPhoneAttributes)
+                                             .build();
     var tempPasswordValidityDays = Duration.days(inParams.getTempPasswordValidityInDays());
     var passwordPolicy = PasswordPolicy.builder()
                                        .requireLowercase(inParams.isPasswordRequireLowercase())
@@ -131,8 +138,7 @@ public final class CognitoStack extends Stack {
 
   private static UserPoolClient userPoolClient(Construct scope, IUserPool userPool,
                                                InputParameters inParams) {
-    var prodAppUrl = String.format("%s/login/oauth2/code/cognito", inParams.getApplicationUrl());
-    var callbackUrls = join(inParams.getUserPoolOauthCallBackUrls(), prodAppUrl);
+    var callbackUrls = join(inParams.getUserPoolOauthCallBackUrls(), inParams.getAppLoginUrl());
     var logoutUrls = List.of(inParams.getApplicationUrl());
     var oAuthConf = OAuthSettings.builder()
                                  .callbackUrls(callbackUrls)
@@ -262,9 +268,13 @@ public final class CognitoStack extends Stack {
   public static final class InputParameters {
     static final String DEFAULT_COGNITO_LOGOUT_URL_TPL
         = "https://%s.auth.%s.amazoncognito.com/logout";
+    static final String DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE
+        = "%s/login/oauth2/code/cognito";
 
     @lombok.Builder.Default
     private String cognitoLogoutUrlTemplate = DEFAULT_COGNITO_LOGOUT_URL_TPL;
+    @lombok.Builder.Default
+    private String cognitoOauthLoginUrlTemplate = DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE;
 
     private String loginPageDomainPrefix;
 
@@ -279,11 +289,14 @@ public final class CognitoStack extends Stack {
     private boolean signInAliasUsername = true;
     @lombok.Builder.Default
     private boolean signInAliasEmail = true;
+    private boolean signInAliasPhone;
     @lombok.Builder.Default
     private boolean signInCaseSensitive = true;
     @lombok.Builder.Default
     private boolean signInEmailRequired = true;
     private boolean signInEmailMutable;
+    private boolean signInPhoneRequired;
+    private boolean signInPhoneMutable;
     @lombok.Builder.Default
     private Mfa mfa = Mfa.OFF;
     @lombok.Builder.Default
@@ -308,6 +321,10 @@ public final class CognitoStack extends Stack {
 
     String getFullLogoutUrlForRegion(String region) {
       return String.format(getCognitoLogoutUrlTemplate(), getLoginPageDomainPrefix(), region);
+    }
+
+    String getAppLoginUrl() {
+      return String.format(getCognitoOauthLoginUrlTemplate(), getApplicationUrl());
     }
   }
 
