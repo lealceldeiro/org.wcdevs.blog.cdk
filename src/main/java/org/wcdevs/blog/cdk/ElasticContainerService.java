@@ -115,7 +115,7 @@ public final class ElasticContainerService extends Construct {
     var appEnv = Objects.requireNonNull(applicationEnvironment);
 
     var eCService = new ElasticContainerService(Objects.requireNonNull(scope),
-                                                 Objects.requireNonNull(id));
+                                                Objects.requireNonNull(id));
 
     var targetGroup = targetGroup(eCService, inParameters, netOutputParams);
     var serviceHttpListenerRules = httpListenerRules(eCService, targetGroup, netOutputParams);
@@ -155,15 +155,15 @@ public final class ElasticContainerService extends Construct {
     return CfnTargetGroup.Builder.create(scope, "targetGroup")
                                  .healthCheckIntervalSeconds(params.getHealthCheckIntervalSeconds())
                                  .healthCheckPath(params.getHealthCheckPath())
-                                 .healthCheckPort(String.valueOf(params.getContainerPort()))
-                                 .healthCheckProtocol(params.getContainerProtocol())
+                                 .healthCheckPort(params.healthCheckPortString())
+                                 .healthCheckProtocol(params.getHealthCheckProtocol())
                                  .healthCheckTimeoutSeconds(params.getHealthCheckTimeoutSeconds())
                                  .healthyThresholdCount(params.getHealthyThresholdCount())
                                  .unhealthyThresholdCount(params.getUnhealthyThresholdCount())
                                  .targetGroupAttributes(stickySessionsConf(params))
                                  .targetType(TARGET_TYPE_IP)
-                                 .port(params.getContainerPort())
-                                 .protocol(params.getContainerProtocol())
+                                 .port(params.getApplicationPort())
+                                 .protocol(params.getApplicationProtocol())
                                  .vpcId(netOutputParameters.getVpcId())
                                  .build();
   }
@@ -299,9 +299,15 @@ public final class ElasticContainerService extends Construct {
                                                             .logDriver(LOG_DRIVER_AWS_LOGS)
                                                             .options(logConfOptions)
                                                             .build();
-    var portMapping = CfnTaskDefinition.PortMappingProperty.builder()
-                                                           .containerPort(params.getContainerPort())
-                                                           .build();
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-containerdefinitions-portmappings.html
+    var portMappings = List.of(
+        CfnTaskDefinition.PortMappingProperty.builder()
+                                             .containerPort(params.getApplicationPort())
+                                             .build(),
+        CfnTaskDefinition.PortMappingProperty.builder()
+                                             .containerPort(params.getHealthCheckPort())
+                                             .build()
+                              );
     var environmentVars = cfnTaskDefKeyValuePropertiesFrom(params.getEnvironmentVariables());
 
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
@@ -311,7 +317,7 @@ public final class ElasticContainerService extends Construct {
                                                         .memory(params.getMemory())
                                                         .image(dockerImageRepositoryUrl)
                                                         .logConfiguration(logConf)
-                                                        .portMappings(List.of(portMapping))
+                                                        .portMappings(portMappings)
                                                         .environment(environmentVars)
                                                         .build();
   }
@@ -403,11 +409,11 @@ public final class ElasticContainerService extends Construct {
         .maximumPercent(params.getMaximumInstancesPercent())
         .minimumHealthyPercent(params.getMinimumHealthyInstancesPercent())
         .build();
-    var loadBalancerConf = CfnService.LoadBalancerProperty.builder()
-                                                          .containerName(containerName(appEnv))
-                                                          .containerPort(params.getContainerPort())
-                                                          .targetGroupArn(targetGroup.getRef())
-                                                          .build();
+    var lBalancerConf = CfnService.LoadBalancerProperty.builder()
+                                                       .containerName(containerName(appEnv))
+                                                       .containerPort(params.getApplicationPort())
+                                                       .targetGroupArn(targetGroup.getRef())
+                                                       .build();
     var vpcConf = CfnService.AwsVpcConfigurationProperty
         .builder()
         .assignPublicIp(ASSIGN_PUBLIC_IP_ENABLED)
@@ -425,7 +431,7 @@ public final class ElasticContainerService extends Construct {
                              .deploymentConfiguration(deployConf)
                              .desiredCount(params.getDesiredInstancesCount())
                              .taskDefinition(taskDefinition.getRef())
-                             .loadBalancers(List.of(loadBalancerConf))
+                             .loadBalancers(List.of(lBalancerConf))
                              .networkConfiguration(netProps)
                              .build();
   }
@@ -459,10 +465,12 @@ public final class ElasticContainerService extends Construct {
     private final List<String> securityGroupIdsToGrantIngressFromEcs;
 
     private List<PolicyStatement> taskRolePolicyStatements = emptyList();
-    private int healthCheckIntervalSeconds = 15;
+    private String applicationProtocol = "HTTP";
+    private int applicationPort = 8080;
+    private String healthCheckProtocol = "HTTP";
+    private int healthCheckPort = 8080;
     private String healthCheckPath = "/";
-    private int containerPort = 8080;
-    private String containerProtocol = "HTTP";
+    private int healthCheckIntervalSeconds = 15;
     private int healthCheckTimeoutSeconds = 5;
     private int healthyThresholdCount = 2;
     private int unhealthyThresholdCount = 8;
@@ -475,6 +483,10 @@ public final class ElasticContainerService extends Construct {
     private boolean stickySessionsEnabled;
     private int stickySessionsCookieDuration = 3600;
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
+
+    String healthCheckPortString() {
+      return String.valueOf(healthCheckPort);
+    }
   }
 
   @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
