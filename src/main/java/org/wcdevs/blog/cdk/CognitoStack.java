@@ -49,9 +49,8 @@ public final class CognitoStack extends Stack {
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
-  private static final String CONSTRUCT_NAME = "Cognito";
+  private static final String CONSTRUCT_NAME = "cognito";
   private static final String DASH_JOINER = "-";
-  private static final String LOG_OUT_URL_TPL = "https://%s.auth.%s.amazoncognito.com/logout";
 
   private CognitoStack(Construct scope, String id, StackProps props) {
     super(scope, id, props);
@@ -63,16 +62,18 @@ public final class CognitoStack extends Stack {
     var inParams = Objects.requireNonNull(inputParameters);
     var region = Objects.requireNonNull(awsEnvironment.getRegion());
 
+    var name = joinedString(DASH_JOINER, CONSTRUCT_NAME, "stack");
     var cognitoPros = StackProps.builder()
-                                .stackName(applicationEnvironment.prefixed(CONSTRUCT_NAME))
+                                .stackName(applicationEnvironment.prefixed(name))
                                 .env(awsEnvironment)
                                 .build();
     var cognitoStack = new CognitoStack(scope, id, cognitoPros);
 
     var userPool = userPool(cognitoStack, inParams);
     var userPoolClient = userPoolClient(cognitoStack, userPool, inParams);
-    var logoutUrl = String.format(LOG_OUT_URL_TPL, inParams.getLoginPageDomainPrefix(), region);
-    var userPoolDomain = userPoolDomain(cognitoStack, userPool, inParams);
+    var logoutUrl = inParams.getFullLogoutUrlForRegion(region);
+
+    createUserPoolDomain(cognitoStack, userPool, inParams);
 
     var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
                                                     userPoolClient.getUserPoolClientId());
@@ -152,8 +153,8 @@ public final class CognitoStack extends Stack {
                                  .build();
   }
 
-  private static UserPoolDomain userPoolDomain(Construct scope, IUserPool userPool,
-                                               InputParameters inParams) {
+  private static UserPoolDomain createUserPoolDomain(Construct scope, IUserPool userPool,
+                                                     InputParameters inParams) {
     var cognitoDomain = CognitoDomainOptions.builder()
                                             .domainPrefix(inParams.getLoginPageDomainPrefix())
                                             .build();
@@ -259,45 +260,55 @@ public final class CognitoStack extends Stack {
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
-    String loginPageDomainPrefix;
-
-    String applicationName;
-    String applicationUrl;
-
-    boolean selfSignUpEnabled;
-    @lombok.Builder.Default
-    AccountRecovery accountRecovery = AccountRecovery.EMAIL_ONLY;
-    boolean signInAutoVerifyEmail;
-    @lombok.Builder.Default
-    boolean signInAliasUsername = true;
-    @lombok.Builder.Default
-    boolean signInAliasEmail = true;
-    @lombok.Builder.Default
-    boolean signInCaseSensitive = true;
-    @lombok.Builder.Default
-    boolean signInEmailRequired = true;
-    boolean signInEmailMutable;
-    @lombok.Builder.Default
-    Mfa mfa = Mfa.OFF;
-    @lombok.Builder.Default
-    boolean passwordRequireLowercase = true;
-    @lombok.Builder.Default
-    boolean passwordRequireDigits = true;
-    @lombok.Builder.Default
-    boolean passwordRequireSymbols = true;
-    @lombok.Builder.Default
-    boolean passwordRequireUppercase = true;
-    @lombok.Builder.Default
-    int passwordMinLength = 8;
-    @lombok.Builder.Default
-    int tempPasswordValidityInDays = 7;
+    static final String DEFAULT_COGNITO_LOGOUT_URL_TPL
+        = "https://%s.auth.%s.amazoncognito.com/logout";
 
     @lombok.Builder.Default
-    boolean userPoolGenerateSecret = true;
+    private String cognitoLogoutUrlTemplate = DEFAULT_COGNITO_LOGOUT_URL_TPL;
+
+    private String loginPageDomainPrefix;
+
+    private String applicationName;
+    private String applicationUrl;
+
+    private boolean selfSignUpEnabled;
     @lombok.Builder.Default
-    List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
+    private AccountRecovery accountRecovery = AccountRecovery.EMAIL_ONLY;
+    private boolean signInAutoVerifyEmail;
     @lombok.Builder.Default
-    List<String> userPoolOauthCallBackUrls = emptyList();
+    private boolean signInAliasUsername = true;
+    @lombok.Builder.Default
+    private boolean signInAliasEmail = true;
+    @lombok.Builder.Default
+    private boolean signInCaseSensitive = true;
+    @lombok.Builder.Default
+    private boolean signInEmailRequired = true;
+    private boolean signInEmailMutable;
+    @lombok.Builder.Default
+    private Mfa mfa = Mfa.OFF;
+    @lombok.Builder.Default
+    private boolean passwordRequireLowercase = true;
+    @lombok.Builder.Default
+    private boolean passwordRequireDigits = true;
+    @lombok.Builder.Default
+    private boolean passwordRequireSymbols = true;
+    @lombok.Builder.Default
+    private boolean passwordRequireUppercase = true;
+    @lombok.Builder.Default
+    private int passwordMinLength = 8;
+    @lombok.Builder.Default
+    private int tempPasswordValidityInDays = 7;
+
+    @lombok.Builder.Default
+    private boolean userPoolGenerateSecret = true;
+    @lombok.Builder.Default
+    private List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
+    @lombok.Builder.Default
+    private List<String> userPoolOauthCallBackUrls = emptyList();
+
+    String getFullLogoutUrlForRegion(String region) {
+      return String.format(getCognitoLogoutUrlTemplate(), getLoginPageDomainPrefix(), region);
+    }
   }
 
   @Getter
