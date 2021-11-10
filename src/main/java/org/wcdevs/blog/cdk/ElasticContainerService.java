@@ -155,7 +155,7 @@ public final class ElasticContainerService extends Construct {
     return CfnTargetGroup.Builder.create(scope, "targetGroup")
                                  .healthCheckIntervalSeconds(params.getHealthCheckIntervalSeconds())
                                  .healthCheckPath(params.getHealthCheckPath())
-                                 .healthCheckPort(params.healthCheckPortString())
+                                 .healthCheckPort(params.getHealthCheckPortString())
                                  .healthCheckProtocol(params.getHealthCheckProtocol())
                                  .healthCheckTimeoutSeconds(params.getHealthCheckTimeoutSeconds())
                                  .healthyThresholdCount(params.getHealthyThresholdCount())
@@ -484,7 +484,7 @@ public final class ElasticContainerService extends Construct {
     private int stickySessionsCookieDuration = 3600;
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
 
-    String healthCheckPortString() {
+    String getHealthCheckPortString() {
       return String.valueOf(healthCheckPort);
     }
   }
