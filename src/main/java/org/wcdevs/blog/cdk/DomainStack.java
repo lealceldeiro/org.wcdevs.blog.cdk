@@ -94,7 +94,7 @@ public final class DomainStack extends Stack {
                                       Objects.requireNonNull(applicationEnvironment));
 
     var hostedZone = hostedZone(domainStack, Objects.requireNonNull(hostedZoneDomainName));
-    var networkParams = Network.outputParametersFrom(scope,
+    var networkParams = Network.outputParametersFrom(domainStack,
                                                      applicationEnvironment.getEnvironmentName());
     var albAttrs = ApplicationLoadBalancerAttributes
         .builder()
@@ -103,9 +103,9 @@ public final class DomainStack extends Stack {
         .loadBalancerCanonicalHostedZoneId(networkParams.getLoadBalancerCanonicalHostedZoneId())
         .loadBalancerDnsName(networkParams.getLoadBalancerDnsName())
         .build();
-    var alb = ApplicationLoadBalancer.fromApplicationLoadBalancerAttributes(scope,
-                                                                            "AppLoadBalancer",
-                                                                            albAttrs);
+    var alb = ApplicationLoadBalancer
+        .fromApplicationLoadBalancerAttributes(domainStack, "AppLoadBalancer", albAttrs);
+
     if (inParams.isSslCertificateActivated()) {
       DnsValidatedCertificate.Builder.create(domainStack, "AppCertificate")
                                      .hostedZone(hostedZone)
@@ -131,15 +131,15 @@ public final class DomainStack extends Stack {
                                                              .conditions(conditions)
                                                              .action(redirection)
                                                              .build();
-      new ApplicationListenerRule(scope, "HttpListenerRule", appListenerRuleProps);
+      new ApplicationListenerRule(domainStack, "HttpListenerRule", appListenerRuleProps);
     }
 
-    ARecord.Builder.create(scope, "ARecord")
+    ARecord.Builder.create(domainStack, "ARecord")
                    .recordName(applicationDomainName)
                    .zone(hostedZone)
                    .target(RecordTarget.fromAlias(new LoadBalancerTarget(alb)))
                    .build();
-    applicationEnvironment.tag(scope);
+    applicationEnvironment.tag(domainStack);
 
     return domainStack;
   }
