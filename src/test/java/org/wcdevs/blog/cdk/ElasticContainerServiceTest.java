@@ -121,7 +121,8 @@ class ElasticContainerServiceTest {
 
   @Test
   void newInputParametersOK() {
-    assertNotNull(ElasticContainerService.newInputParameters(mock(ElasticContainerService.DockerImage.class),
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    assertNotNull(ElasticContainerService.newInputParameters(dockerImage,
                                                              Map.of("k1", "v1"), List.of("id1")));
   }
 
@@ -132,25 +133,29 @@ class ElasticContainerServiceTest {
 
   @Test
   void newInputParametersNPEForNullEnvironmentVariables() {
-    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class), null, List.of("id1"));
+    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class), null,
+                              List.of("id1"));
   }
 
   @Test
   void newInputParametersNPEForNullListOfGroupIds() {
-    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class), Map.of("k1", "v1"), null);
+    testNewInputParametersNPE(mock(ElasticContainerService.DockerImage.class),
+                              Map.of("k1", "v1"), null);
   }
 
   void testNewInputParametersNPE(ElasticContainerService.DockerImage dockerImage,
                                  Map<String, String> environmentVariables,
                                  List<String> secGroupIdsToGrantIngressFromEcs) {
-    Executable executable = () -> ElasticContainerService.newInputParameters(dockerImage, environmentVariables,
-                                                                             secGroupIdsToGrantIngressFromEcs);
+    Executable executable
+        = () -> ElasticContainerService.newInputParameters(dockerImage, environmentVariables,
+                                                           secGroupIdsToGrantIngressFromEcs);
     assertThrows(NullPointerException.class, executable);
   }
 
   @Test
   void newDockerImageOK() {
-    assertNotNull(ElasticContainerService.newDockerImage(randomString(), randomString(), randomString()));
+    assertNotNull(ElasticContainerService.newDockerImage(randomString(), randomString(),
+                                                         randomString()));
   }
 
   static Stream<Arguments> newDockerImageThrowsIAEIFParamsAreIncorrectArgs() {
@@ -172,7 +177,8 @@ class ElasticContainerServiceTest {
   @Test
   void testInputParameterGetDockerImage() {
     var dockerImage = mock(ElasticContainerService.DockerImage.class);
-    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(), emptyList());
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage, emptyMap(),
+                                                                      emptyList());
 
     assertSame(dockerImage, inputParameters.getDockerImage());
   }
@@ -180,8 +186,10 @@ class ElasticContainerServiceTest {
   @Test
   void testInputParameterGetEnvironmentVariables() {
     var environmentVariables = Map.of(randomString(), randomString());
-    var inputParameters = new ElasticContainerService.InputParameters(mock(ElasticContainerService.DockerImage.class),
-                                                                      environmentVariables, emptyList());
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters = new ElasticContainerService.InputParameters(dockerImage,
+                                                                      environmentVariables,
+                                                                      emptyList());
 
     assertEquals(environmentVariables, inputParameters.getEnvironmentVariables());
   }
@@ -189,9 +197,11 @@ class ElasticContainerServiceTest {
   @Test
   void testInputParameterGetSecGroupIdsToGrantIngressFromEcs() {
     List<String> secGroupIdsToGrantIngressFromEcs = emptyList();
-    var inputParameters = new ElasticContainerService.InputParameters(mock(ElasticContainerService.DockerImage.class),
-                                                                      emptyMap(),
-                                                                      secGroupIdsToGrantIngressFromEcs);
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var inputParameters
+        = new ElasticContainerService.InputParameters(dockerImage,
+                                                      emptyMap(),
+                                                      secGroupIdsToGrantIngressFromEcs);
 
     assertEquals(secGroupIdsToGrantIngressFromEcs,
                  inputParameters.getSecurityGroupIdsToGrantIngressFromEcs());
@@ -227,14 +237,26 @@ class ElasticContainerServiceTest {
 
   @Test
   void testInputParameterGetContainerPort() {
-    testInputParameterGet("containerPort", RANDOM.nextInt(),
-                          ElasticContainerService.InputParameters::getContainerPort);
+    testInputParameterGet("applicationPort", RANDOM.nextInt(),
+                          ElasticContainerService.InputParameters::getApplicationPort);
   }
 
   @Test
-  void testInputParameterGetContainerProtocol() {
-    testInputParameterGet("containerProtocol", randomString(),
-                          ElasticContainerService.InputParameters::getContainerProtocol);
+  void testInputParameterGetHealthCheckPort() {
+    testInputParameterGet("healthCheckPort", RANDOM.nextInt(),
+                          ElasticContainerService.InputParameters::getHealthCheckPort);
+  }
+
+  @Test
+  void testInputParameterGetApplicationProtocol() {
+    testInputParameterGet("applicationProtocol", randomString(),
+                          ElasticContainerService.InputParameters::getApplicationProtocol);
+  }
+
+  @Test
+  void testInputParameterGetHealthCheckProtocol() {
+    testInputParameterGet("healthCheckProtocol", randomString(),
+                          ElasticContainerService.InputParameters::getHealthCheckProtocol);
   }
 
   @Test
@@ -340,17 +362,31 @@ class ElasticContainerServiceTest {
   }
 
   @Test
-  void testInputParameterSetContainerPort() {
+  void testInputParameterSetHealthCheckPort() {
     var expected = RANDOM.nextInt();
-    testInputParameterSet("containerPort", expected,
-                          input -> input.setContainerPort(expected));
+    testInputParameterSet("healthCheckPort", expected,
+                          input -> input.setHealthCheckPort(expected));
   }
 
   @Test
-  void testInputParameterSetContainerProtocol() {
+  void testInputParameterSetHealthCheckProtocol() {
     var expected = randomString();
-    testInputParameterSet("containerProtocol", expected,
-                          input -> input.setContainerProtocol(expected));
+    testInputParameterSet("healthCheckProtocol", expected,
+                          input -> input.setHealthCheckProtocol(expected));
+  }
+
+  @Test
+  void testInputParameterSetApplicationPort() {
+    var expected = RANDOM.nextInt();
+    testInputParameterSet("applicationPort", expected,
+                          input -> input.setApplicationPort(expected));
+  }
+
+  @Test
+  void testInputParameterSetApplicationProtocol() {
+    var expected = randomString();
+    testInputParameterSet("applicationProtocol", expected,
+                          input -> input.setApplicationProtocol(expected));
   }
 
   @Test
@@ -440,7 +476,8 @@ class ElasticContainerServiceTest {
   @Test
   void testDockerImageGetDockerRepositoryName() {
     var expected = randomString();
-    var dockerImage = new ElasticContainerService.DockerImage(expected, randomString(), randomString());
+    var dockerImage = new ElasticContainerService.DockerImage(expected, randomString(),
+                                                              randomString());
 
     assertEquals(expected, dockerImage.getDockerRepositoryName());
   }
@@ -448,7 +485,8 @@ class ElasticContainerServiceTest {
   @Test
   void testDockerImageGetDockerImageTag() {
     var expected = randomString();
-    var dockerImage = new ElasticContainerService.DockerImage(randomString(), expected, randomString());
+    var dockerImage = new ElasticContainerService.DockerImage(randomString(), expected,
+                                                              randomString());
 
     assertEquals(expected, dockerImage.getDockerImageTag());
   }
@@ -456,14 +494,16 @@ class ElasticContainerServiceTest {
   @Test
   void testDockerImageGetDockerImageUrl() {
     var expected = randomString();
-    var dockerImage = new ElasticContainerService.DockerImage(randomString(), randomString(), expected);
+    var dockerImage = new ElasticContainerService.DockerImage(randomString(), randomString(),
+                                                              expected);
 
     assertEquals(expected, dockerImage.getDockerImageUrl());
   }
 
   @Test
   void dockerImageIsEcrSourceReturnsTrueIfDockerRepositoryNameIsNotNull() {
-    assertTrue(new ElasticContainerService.DockerImage(randomString(), randomString(), randomString())
+    assertTrue(new ElasticContainerService.DockerImage(randomString(), randomString(),
+                                                       randomString())
                    .isEcrSource());
   }
 
@@ -478,7 +518,8 @@ class ElasticContainerServiceTest {
     StaticallyMockedCdk.executeTest(() -> {
       try (var ignored = mockStatic(CfnListenerRule.class)) {
         var httpRule = mock(CfnListenerRule.class);
-        var rules = new ElasticContainerService.ServiceListenerRules(httpRule, mock(CfnListenerRule.class));
+        var rules = new ElasticContainerService.ServiceListenerRules(httpRule,
+                                                                     mock(CfnListenerRule.class));
 
         assertEquals(httpRule, rules.getHttpRule());
       }
@@ -490,7 +531,8 @@ class ElasticContainerServiceTest {
     StaticallyMockedCdk.executeTest(() -> {
       try (var ignored = mockStatic(CfnListenerRule.class)) {
         var httpsRule = mock(CfnListenerRule.class);
-        var rules = new ElasticContainerService.ServiceListenerRules(mock(CfnListenerRule.class), httpsRule);
+        var rules = new ElasticContainerService.ServiceListenerRules(mock(CfnListenerRule.class),
+                                                                     httpsRule);
 
         assertEquals(httpsRule, rules.getHttpsRule());
       }
