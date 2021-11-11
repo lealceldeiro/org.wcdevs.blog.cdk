@@ -206,7 +206,7 @@ public final class ElasticContainerService extends Construct {
                                                .field(LISTENER_RULE_CONDITION_PATH_PATTERN)
                                                .values(List.of("*"))
                                                .build();
-    var nullValue = Network.NULL_HTTPS_LISTENER_ARN_VALUE;
+    var nullValue = Network.NULL_ARN_VALUE;
     var httpsListenerArn = netOutputParams.getHttpsListenerArn().orElse(nullValue);
 
     var httpsListenerIsNotNull = Fn.conditionNot(Fn.conditionEquals(httpsListenerArn, nullValue));
