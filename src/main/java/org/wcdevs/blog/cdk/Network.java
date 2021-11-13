@@ -56,7 +56,7 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 @Getter(AccessLevel.PACKAGE)
 public final class Network extends Construct {
   // region private constants
-  private static final String CLUSTER_NAME = "ecsCluster";
+  private static final String CLUSTER_NAME = "EcsCluster";
 
   private static final String PARAM_VPC_ID = "vpcId";
   private static final String PARAM_HTTP_LISTENER_ARN = "httpListenerArn";
@@ -103,7 +103,7 @@ public final class Network extends Construct {
   /**
    * Represents there's no https listener arn.
    */
-  public static final String NULL_HTTPS_LISTENER_ARN_VALUE = "null";
+  public static final String NULL_ARN_VALUE = "null";
   // endregion
 
   private Network(Construct scope, String id) {
@@ -237,8 +237,7 @@ public final class Network extends Construct {
     httpListener.addTargetGroups("http", appTargetGroupProps);
 
     IApplicationListener httpsListener = null;
-    if (Objects.nonNull(sslCertificateArn) &&
-        !NULL_HTTPS_LISTENER_ARN_VALUE.equals(sslCertificateArn)) {
+    if (arnNotNull(sslCertificateArn)) {
       var certificate = ListenerCertificate.fromArn(sslCertificateArn);
       var httpsListenerProps
           = BaseApplicationListenerProps.builder()
@@ -284,7 +283,7 @@ public final class Network extends Construct {
 
     var httpsListenerArn = network.getHttpsListener() != null
                            ? network.getHttpsListener().getListenerArn()
-                           : NULL_HTTPS_LISTENER_ARN_VALUE;
+                           : NULL_ARN_VALUE;
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
 
     createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
@@ -459,6 +458,10 @@ public final class Network extends Construct {
         getLoadBalancerDnsName(scope, envName),
         getLoadBalancerCanonicalHostedZoneId(scope, envName)
     );
+  }
+
+  public static boolean arnNotNull(String arn) {
+    return Objects.nonNull(arn) && !NULL_ARN_VALUE.equalsIgnoreCase(arn);
   }
   // endregion
 

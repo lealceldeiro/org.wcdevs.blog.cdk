@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -29,17 +30,24 @@ class DomainStackTest {
   }
 
   private static Stream<Arguments> newInstanceArgs() {
-    return Stream.of(Arguments.arguments(false, false), Arguments.arguments(true, false),
-                     Arguments.arguments(true, true));
+    return Stream.of(arguments(false, false, false),
+                     arguments(true, false, false),
+                     arguments(false, false, true),
+                     arguments(false, true, true),
+                     arguments(true, false, true),
+                     arguments(true, true, false),
+                     arguments(true, true, true));
   }
 
   @ParameterizedTest
   @MethodSource("newInstanceArgs")
-  void newInstance(boolean withCustomInputParams, boolean sslActivated) {
+  void newInstance(boolean withCustomInputParams, boolean sslActivated,
+                   boolean isThereHttpListenerAlreadyInNetwork) {
     StaticallyMockedCdk.executeTest(() -> {
       try (
           var mockedNetwork = mockStatic(Network.class);
           var mockedApplicationLoadBalancer = mockStatic(ApplicationLoadBalancer.class);
+          var mockedApplicationListener = mockStatic(ApplicationListener.class)
       ) {
         var netOutParamsMock = mock(Network.OutputParameters.class);
         when(netOutParamsMock.getLoadBalancerArn()).thenReturn(randomString());
@@ -48,6 +56,11 @@ class DomainStackTest {
         when(netOutParamsMock.getLoadBalancerDnsName()).thenReturn(randomString());
         mockedNetwork.when(() -> Network.outputParametersFrom(any(), any()))
                      .thenReturn(netOutParamsMock);
+        mockedNetwork.when(() -> Network.arnNotNull(any()))
+                     .thenReturn(isThereHttpListenerAlreadyInNetwork);
+
+        mockedApplicationListener.when(() -> ApplicationListener.fromLookup(any(), any(), any()))
+                                 .thenReturn(mock(ApplicationListener.class));
 
         var applicationLoadBalancerMock = mock(ApplicationLoadBalancer.class);
         when(applicationLoadBalancerMock.addListener(any(), any()))
