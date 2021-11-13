@@ -56,7 +56,7 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 @Getter(AccessLevel.PACKAGE)
 public final class Network extends Construct {
   // region private constants
-  private static final String CLUSTER_NAME = "ecsCluster";
+  private static final String CLUSTER_NAME = "EcsCluster";
 
   private static final String PARAM_VPC_ID = "vpcId";
   private static final String PARAM_HTTP_LISTENER_ARN = "httpListenerArn";

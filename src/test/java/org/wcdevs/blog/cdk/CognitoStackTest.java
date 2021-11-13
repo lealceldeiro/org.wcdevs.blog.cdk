@@ -12,6 +12,8 @@ import software.amazon.awscdk.services.cognito.OAuthFlows;
 import software.amazon.awscdk.services.cognito.OAuthScope;
 import software.amazon.awscdk.services.cognito.OAuthSettings;
 import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
+import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -150,5 +153,20 @@ class CognitoStackTest {
     var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
                                          input.getApplicationUrl());
     assertEquals(expectedLoginUrl, input.getAppLoginUrl());
+  }
+
+  @Test
+  void getUserPoolClientSecret() {
+    var arn = randomString();
+    var secretMock = mock(ISecret.class);
+
+    try (var mockedSecret = mockStatic(Secret.class)) {
+      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), eq(arn)))
+                  .thenReturn(secretMock);
+      var output = mock(CognitoStack.OutputParameters.class);
+      when(output.getUserPoolClientSecretArn()).thenReturn(arn);
+
+      assertEquals(secretMock, CognitoStack.getUserPoolClientSecret(mock(Construct.class), output));
+    }
   }
 }
