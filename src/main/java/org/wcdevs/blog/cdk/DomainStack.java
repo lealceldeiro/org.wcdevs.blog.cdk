@@ -8,12 +8,15 @@ import software.amazon.awscdk.core.Stack;
 import software.amazon.awscdk.core.StackProps;
 import software.amazon.awscdk.services.certificatemanager.DnsValidatedCertificate;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerLookupOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRule;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRuleProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancerAttributes;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocol;
 import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
 import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
@@ -103,7 +106,7 @@ public final class DomainStack extends Stack {
         .loadBalancerCanonicalHostedZoneId(networkParams.getLoadBalancerCanonicalHostedZoneId())
         .loadBalancerDnsName(networkParams.getLoadBalancerDnsName())
         .build();
-    var alb = ApplicationLoadBalancer
+    var appLoadBalancer = ApplicationLoadBalancer
         .fromApplicationLoadBalancerAttributes(domainStack, "AppLoadBalancer", albAttrs);
 
     if (inParams.isSslCertificateActivated()) {
@@ -113,14 +116,10 @@ public final class DomainStack extends Stack {
                                      .domainName(applicationDomainName)
                                      .subjectAlternativeNames(List.of(applicationDomainName))
                                      .build();
-      var httpListenerProps = BaseApplicationListenerProps.builder()
-                                                          .protocol(ApplicationProtocol.HTTP)
-                                                          .port(inParams.getHttpPortNumber())
-                                                          .build();
-      var httpListener = alb.addListener("HttpListener", httpListenerProps);
       var redirection = ListenerAction.redirect(RedirectOptions.builder()
                                                                .port(inParams.getHttpsPort())
                                                                .build());
+      var httpListener = getHttpListener(domainStack, appLoadBalancer, inParams, networkParams);
       httpListener.addAction("RedirectHttpToHttps", AddApplicationActionProps.builder()
                                                                              .action(redirection)
                                                                              .build());
@@ -137,7 +136,7 @@ public final class DomainStack extends Stack {
     ARecord.Builder.create(domainStack, "ARecord")
                    .recordName(applicationDomainName)
                    .zone(hostedZone)
-                   .target(RecordTarget.fromAlias(new LoadBalancerTarget(alb)))
+                   .target(RecordTarget.fromAlias(new LoadBalancerTarget(appLoadBalancer)))
                    .build();
     applicationEnvironment.tag(domainStack);
 
@@ -149,6 +148,25 @@ public final class DomainStack extends Stack {
                                                          .domainName(hostedZoneDomainName)
                                                          .build();
     return HostedZone.fromLookup(scope, "HostedZone", hostedZoneProviderProps);
+  }
+
+  private static ApplicationListener getHttpListener(Construct scope,
+                                                     IApplicationLoadBalancer loadBalancer,
+                                                     InputParameters inParams,
+                                                     Network.OutputParameters netOutputParams) {
+    var httpListenerName = "HttpListener";
+    if (Network.arnNotNull(netOutputParams.getHttpListenerArn())) {
+      var lookUp = ApplicationListenerLookupOptions.builder()
+                                                  .listenerArn(netOutputParams.getHttpListenerArn())
+                                                  .build();
+      return (ApplicationListener) ApplicationListener.fromLookup(scope, httpListenerName, lookUp);
+    }
+
+    return loadBalancer.addListener(httpListenerName,
+                                    BaseApplicationListenerProps.builder()
+                                                                .protocol(ApplicationProtocol.HTTP)
+                                                                .port(inParams.getHttpPortNumber())
+                                                                .build());
   }
 
   @lombok.Builder
