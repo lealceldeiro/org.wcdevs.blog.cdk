@@ -116,21 +116,6 @@ public final class DomainStack extends Stack {
                                      .domainName(applicationDomainName)
                                      .subjectAlternativeNames(List.of(applicationDomainName))
                                      .build();
-      var redirection = ListenerAction.redirect(RedirectOptions.builder()
-                                                               .port(inParams.getHttpsPort())
-                                                               .build());
-      var httpListener = getHttpListener(domainStack, appLoadBalancer, inParams, networkParams);
-      httpListener.addAction("RedirectHttpToHttps", AddApplicationActionProps.builder()
-                                                                             .action(redirection)
-                                                                             .build());
-      var conditions = List.of(ListenerCondition.pathPatterns(List.of("*")));
-      var appListenerRuleProps = ApplicationListenerRuleProps.builder()
-                                                             .listener(httpListener)
-                                                             .priority(1)
-                                                             .conditions(conditions)
-                                                             .action(redirection)
-                                                             .build();
-      new ApplicationListenerRule(domainStack, "HttpListenerRule", appListenerRuleProps);
     }
 
     ARecord.Builder.create(domainStack, "ARecord")
@@ -150,37 +135,10 @@ public final class DomainStack extends Stack {
     return HostedZone.fromLookup(scope, "HostedZone", hostedZoneProviderProps);
   }
 
-  private static ApplicationListener getHttpListener(Construct scope,
-                                                     IApplicationLoadBalancer loadBalancer,
-                                                     InputParameters inParams,
-                                                     Network.OutputParameters netOutputParams) {
-    var httpListenerName = "HttpListener";
-    if (Network.arnNotNull(netOutputParams.getHttpListenerArn())) {
-      var lookUp = ApplicationListenerLookupOptions.builder()
-                                                  .listenerArn(netOutputParams.getHttpListenerArn())
-                                                  .build();
-      return (ApplicationListener) ApplicationListener.fromLookup(scope, httpListenerName, lookUp);
-    }
-
-    return loadBalancer.addListener(httpListenerName,
-                                    BaseApplicationListenerProps.builder()
-                                                                .protocol(ApplicationProtocol.HTTP)
-                                                                .port(inParams.getHttpPortNumber())
-                                                                .build());
-  }
-
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
     @lombok.Builder.Default
     private boolean sslCertificateActivated = true;
-    @lombok.Builder.Default
-    private int httpPortNumber = 80;
-    @lombok.Builder.Default
-    private int httpsPortNumber = 443;
-
-    String getHttpsPort() {
-      return String.valueOf(httpsPortNumber);
-    }
   }
 }

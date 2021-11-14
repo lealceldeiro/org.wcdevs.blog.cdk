@@ -348,14 +348,16 @@ class NetworkTest {
     var maxAZs = random.nextInt();
     var listeningExternalPort = random.nextInt();
     var listeningInternalPort = random.nextInt();
+    var listeningHttpsPort = random.nextInt();
     var input = Network.InputParameters.builder()
                                        .sslCertificateArn(sslCertificateArn)
                                        .natGatewayNumber(natGatewayNumber)
                                        .numberOfIsolatedSubnetsPerAZ(numberOfIsolatedSubnetsPerAZ)
                                        .numberOfPublicSubnetsPerAZ(numberOfPublicSubnetsPerAZ)
                                        .maxAZs(maxAZs)
-                                       .listeningExternalPort(listeningExternalPort)
-                                       .listeningInternalPort(listeningInternalPort)
+                                       .listeningExternalHttpPort(listeningExternalPort)
+                                       .listeningInternalHttpPort(listeningInternalPort)
+                                       .listeningHttpsPort(listeningHttpsPort)
                                        .build();
 
     assertNotNull(input);
@@ -364,7 +366,20 @@ class NetworkTest {
     assertEquals(numberOfIsolatedSubnetsPerAZ, input.getNumberOfIsolatedSubnetsPerAZ());
     assertEquals(numberOfPublicSubnetsPerAZ, input.getNumberOfPublicSubnetsPerAZ());
     assertEquals(maxAZs, input.getMaxAZs());
-    assertEquals(listeningExternalPort, input.getListeningExternalPort());
-    assertEquals(listeningInternalPort, input.getListeningInternalPort());
+    assertEquals(listeningExternalPort, input.getListeningExternalHttpPort());
+    assertEquals(listeningInternalPort, input.getListeningInternalHttpPort());
+    assertEquals(listeningHttpsPort, input.getListeningHttpsPort());
+    assertEquals(String.valueOf(listeningHttpsPort), input.getListeningHttpsPortString());
+  }
+
+  private static Stream<Arguments> isArnNotNullReturnsCorrectlyArgs() {
+    return Stream.of(arguments(randomString(), true), arguments("", false), arguments("  ", false),
+                     arguments(null, false), arguments("null", false));
+  }
+
+  @ParameterizedTest
+  @MethodSource("isArnNotNullReturnsCorrectlyArgs")
+  void isArnNotNullReturnsCorrectly(String input, boolean expected) {
+    assertEquals(expected, Network.isArnNotNull(input));
   }
 }

@@ -30,19 +30,15 @@ class DomainStackTest {
   }
 
   private static Stream<Arguments> newInstanceArgs() {
-    return Stream.of(arguments(false, false, false),
-                     arguments(true, false, false),
-                     arguments(false, false, true),
-                     arguments(false, true, true),
-                     arguments(true, false, true),
-                     arguments(true, true, false),
-                     arguments(true, true, true));
+    return Stream.of(arguments(false, false),
+                     arguments(true, false),
+                     arguments(false, true),
+                     arguments(true, true));
   }
 
   @ParameterizedTest
   @MethodSource("newInstanceArgs")
-  void newInstance(boolean withCustomInputParams, boolean sslActivated,
-                   boolean isThereHttpListenerAlreadyInNetwork) {
+  void newInstance(boolean withCustomInputParams, boolean sslActivated) {
     StaticallyMockedCdk.executeTest(() -> {
       try (
           var mockedNetwork = mockStatic(Network.class);
@@ -56,8 +52,6 @@ class DomainStackTest {
         when(netOutParamsMock.getLoadBalancerDnsName()).thenReturn(randomString());
         mockedNetwork.when(() -> Network.outputParametersFrom(any(), any()))
                      .thenReturn(netOutParamsMock);
-        mockedNetwork.when(() -> Network.arnNotNull(any()))
-                     .thenReturn(isThereHttpListenerAlreadyInNetwork);
 
         mockedApplicationListener.when(() -> ApplicationListener.fromLookup(any(), any(), any()))
                                  .thenReturn(mock(ApplicationListener.class));
@@ -78,9 +72,7 @@ class DomainStackTest {
         var applicationDomain = randomString();
 
         var inputParams = DomainStack.InputParameters.builder()
-                                                     .httpPortNumber(RANDOM.nextInt())
                                                      .sslCertificateActivated(sslActivated)
-                                                     .httpPortNumber(RANDOM.nextInt())
                                                      .build();
 
         var actual = withCustomInputParams
@@ -95,18 +87,11 @@ class DomainStackTest {
 
   @Test
   void inputParameters() {
-    var httpsPortNumber = RANDOM.nextInt();
     var sslCertificateActivated = RANDOM.nextBoolean();
-    var httpPortNumber = RANDOM.nextInt();
     var parameters = DomainStack.InputParameters.builder()
-                                                .httpsPortNumber(httpsPortNumber)
                                                 .sslCertificateActivated(sslCertificateActivated)
-                                                .httpPortNumber(httpPortNumber)
                                                 .build();
     assertNotNull(parameters);
-    assertEquals(httpPortNumber, parameters.getHttpPortNumber());
-    assertEquals(httpsPortNumber, parameters.getHttpsPortNumber());
-    assertEquals(String.valueOf(httpsPortNumber), parameters.getHttpsPort());
     assertEquals(sslCertificateActivated, parameters.isSslCertificateActivated());
   }
 }
