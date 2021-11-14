@@ -18,13 +18,18 @@ import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ICluster;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRule;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRuleProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocol;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationTargetGroup;
 import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationListener;
 import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationLoadBalancer;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCertificate;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
+import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.TargetType;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
@@ -69,6 +74,7 @@ public final class Network extends Construct {
   private static final String PARAM_AVAILABILITY_ZONES = "availabilityZn";
   private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNetId";
   private static final String PARAM_PUBLIC_SUBNETS = "publicSubNetId";
+  private static final String PARAM_SSL_CERTIFICATE_ARN = "sslCertificateArn";
   private static final String CONSTRUCT_NAME = "Network";
   private static final String DASH_JOINER = "-";
   // endregion
@@ -140,16 +146,13 @@ public final class Network extends Construct {
     var cluster = clusterFrom(network, vpc, joinedString(DASH_JOINER, envName, CLUSTER_NAME));
     network.setEcsCluster(cluster);
 
-    var loadBalancerInfo = createLoadBalancer(network, envName, vpc,
-                                              validInParams.getListeningInternalPort(),
-                                              validInParams.getListeningInternalPort(),
-                                              validInParams.getSslCertificateArn());
+    var loadBalancerInfo = createLoadBalancer(network, envName, vpc, validInParams);
     network.setLoadBalancerSecurityGroup(loadBalancerInfo.getSecurityGroup());
     network.setLoadBalancer(loadBalancerInfo.getApplicationLoadBalancer());
     network.setHttpListener(loadBalancerInfo.getHttpListener());
     loadBalancerInfo.getHttpsListener().ifPresent(network::setHttpsListener);
 
-    saveNetworkInfoToParameterStore(network);
+    saveNetworkInfoToParameterStore(network, inputParameters);
 
     Tags.of(network).add("environment", envName);
 
@@ -195,8 +198,7 @@ public final class Network extends Construct {
   }
 
   private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
-                                                     IVpc vpc, int internalPort, int externalPort,
-                                                     String sslCertificateArn) {
+                                                     IVpc vpc, InputParameters inParams) {
     var securityGroupName = joinedString(DASH_JOINER, environmentName, "loadbalancerSecurityGroup");
     var description = "Public access to the load balancer.";
     var loadBalancerSecurityGroup = SecurityGroup.Builder.create(scope, "loadbalancerSecurityGroup")
@@ -218,30 +220,31 @@ public final class Network extends Construct {
     var targetGroup = singletonList(
         ApplicationTargetGroup.Builder.create(scope, "targetGroup")
                                       .vpc(vpc)
-                                      .port(internalPort)
+                                      .port(inParams.getListeningInternalHttpPort())
                                       .protocol(ApplicationProtocol.HTTP)
                                       .targetGroupName(targetGroupName)
                                       .targetType(TargetType.IP)
                                       .build()
                                    );
 
-    var httpListenerProps = BaseApplicationListenerProps.builder()
-                                                        .port(externalPort)
-                                                        .protocol(ApplicationProtocol.HTTP)
-                                                        .open(true)
-                                                        .build();
+    var httpListenerProps
+        = BaseApplicationListenerProps.builder()
+                                      .port(inParams.getListeningExternalHttpPort())
+                                      .protocol(ApplicationProtocol.HTTP)
+                                      .open(true)
+                                      .build();
     var appTargetGroupProps = AddApplicationTargetGroupsProps.builder()
                                                              .targetGroups(targetGroup)
                                                              .build();
     var httpListener = loadBalancer.addListener("httpListener", httpListenerProps);
-    httpListener.addTargetGroups("http", appTargetGroupProps);
+    httpListener.addTargetGroups("httpTargetGroup", appTargetGroupProps);
 
     IApplicationListener httpsListener = null;
-    if (arnNotNull(sslCertificateArn)) {
-      var certificate = ListenerCertificate.fromArn(sslCertificateArn);
+    if (isArnNotNull(inParams.getSslCertificateArn())) {
+      var certificate = ListenerCertificate.fromArn(inParams.getSslCertificateArn());
       var httpsListenerProps
           = BaseApplicationListenerProps.builder()
-                                        .port(443)
+                                        .port(inParams.getListeningHttpsPort())
                                         .protocol(ApplicationProtocol.HTTPS)
                                         .certificates(singletonList(certificate))
                                         .open(true)
@@ -250,7 +253,20 @@ public final class Network extends Construct {
       var appsTargetGroupProps = AddApplicationTargetGroupsProps.builder()
                                                                 .targetGroups(targetGroup)
                                                                 .build();
-      httpsListener.addTargetGroups("https", appsTargetGroupProps);
+      httpsListener.addTargetGroups("httpsTargetGroup", appsTargetGroupProps);
+
+      var redirection
+          = ListenerAction.redirect(RedirectOptions.builder()
+                                                   .port(inParams.getListeningHttpsPortString())
+                                                   .build());
+      var conditions = List.of(ListenerCondition.pathPatterns(List.of("*")));
+      var appListenerRuleProps = ApplicationListenerRuleProps.builder()
+                                                             .listener(httpListener)
+                                                             .priority(1)
+                                                             .conditions(conditions)
+                                                             .action(redirection)
+                                                             .build();
+      new ApplicationListenerRule(scope, "HttpListenerRule", appListenerRuleProps);
     }
 
     return new LoadBalancerInfo(loadBalancerSecurityGroup, loadBalancer, httpListener,
@@ -267,7 +283,7 @@ public final class Network extends Construct {
                                           .build();
   }
 
-  private static void saveNetworkInfoToParameterStore(Network network) {
+  private static void saveNetworkInfoToParameterStore(Network network, InputParameters inParams) {
     createStringParameter(network, PARAM_VPC_ID, network.getVpc().getVpcId());
     createStringParameter(network, PARAM_CLUSTER_NAME, network.getEcsCluster().getClusterName());
     createStringParameter(network, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID,
@@ -285,6 +301,7 @@ public final class Network extends Construct {
                            ? network.getHttpsListener().getListenerArn()
                            : NULL_ARN_VALUE;
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
+    createStringParameter(network, PARAM_SSL_CERTIFICATE_ARN, inParams.getSslCertificateArn());
 
     createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
                               network.getVpc().getAvailabilityZones(),
@@ -364,6 +381,10 @@ public final class Network extends Construct {
 
   public static String getHttpsListenerArn(Construct networkScope, String environmentName) {
     return getParameter(networkScope, environmentName, PARAM_HTTPS_LISTENER_ARN);
+  }
+
+  public static String getSslCertificateArn(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_SSL_CERTIFICATE_ARN);
   }
 
   public static List<String> getParameterList(Construct networkScope, String environmentName,
@@ -449,6 +470,7 @@ public final class Network extends Construct {
         getVPCId(scope, envName),
         getHttpListenerArn(scope, envName),
         getHttpsListenerArn(scope, envName),
+        getSslCertificateArn(scope, envName),
         getLoadBalancerSecurityGroupId(scope, envName),
         getClusterName(scope, envName),
         getIsolatedSubnets(scope, envName, totalIsolatedSubnets),
@@ -460,8 +482,9 @@ public final class Network extends Construct {
     );
   }
 
-  public static boolean arnNotNull(String arn) {
-    return Objects.nonNull(arn) && !NULL_ARN_VALUE.equalsIgnoreCase(arn);
+  public static boolean isArnNotNull(String arn) {
+    return Objects.nonNull(arn)
+           && !(arn.isEmpty() || arn.isBlank() || NULL_ARN_VALUE.equalsIgnoreCase(arn));
   }
   // endregion
 
@@ -483,9 +506,15 @@ public final class Network extends Construct {
     @lombok.Builder.Default
     private int maxAZs = DEFAULT_NUMBER_OF_AZ;
     @lombok.Builder.Default
-    private int listeningInternalPort = 8080;
+    private int listeningInternalHttpPort = 8080;
     @lombok.Builder.Default
-    private int listeningExternalPort = 80;
+    private int listeningExternalHttpPort = 80;
+    @lombok.Builder.Default
+    private int listeningHttpsPort = 443;
+
+    String getListeningHttpsPortString() {
+      return String.valueOf(listeningHttpsPort);
+    }
   }
 
   /**
@@ -498,6 +527,7 @@ public final class Network extends Construct {
     private final String httpListenerArn;
     @Getter(AccessLevel.NONE)
     private final String httpsListenerArn;
+    private final String sslCertificateArn;
     private final String loadbalancerSecurityGroupId;
     private final String ecsClusterName;
     private final List<String> isolatedSubnets;

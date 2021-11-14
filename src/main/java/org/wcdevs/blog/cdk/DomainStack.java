@@ -1,25 +1,12 @@
 package org.wcdevs.blog.cdk;
 
-import lombok.AccessLevel;
-import lombok.Getter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.Stack;
 import software.amazon.awscdk.core.StackProps;
 import software.amazon.awscdk.services.certificatemanager.DnsValidatedCertificate;
-import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerLookupOptions;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRule;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListenerRuleProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancerAttributes;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocol;
-import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
-import software.amazon.awscdk.services.elasticloadbalancingv2.IApplicationLoadBalancer;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
-import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
 import software.amazon.awscdk.services.route53.ARecord;
 import software.amazon.awscdk.services.route53.HostedZone;
 import software.amazon.awscdk.services.route53.HostedZoneProviderProps;
@@ -52,7 +39,7 @@ public final class DomainStack extends Stack {
   }
 
   /**
-   * Creates a new Domain Stack with the default input configuration.
+   * Creates a new Domain Stack.
    *
    * @param scope                  Scope for the Domain Stack construct to be created.
    * @param id                     A unique identifier.
@@ -61,37 +48,12 @@ public final class DomainStack extends Stack {
    *                               others) was deployed.
    * @param hostedZoneDomainName   The (sub) domain name of the hosted zone.
    * @param applicationDomainName  The application (sub) domain.
-   *
-   * @return The newly created {@link DomainStack}.
-   *
-   * @see InputParameters
-   */
-  public static DomainStack newInstance(Construct scope, String id, Environment awsEnvironment,
-                                        ApplicationEnvironment applicationEnvironment,
-                                        String hostedZoneDomainName, String applicationDomainName) {
-    return newInstance(scope, id, awsEnvironment, applicationEnvironment, hostedZoneDomainName,
-                       applicationDomainName, InputParameters.builder().build());
-  }
-
-  /**
-   * Creates a new Domain Stack by accepting configuration input parameters.
-   *
-   * @param scope                  Scope for the Domain Stack construct to be created.
-   * @param id                     A unique identifier.
-   * @param awsEnvironment         AWS Environment.
-   * @param applicationEnvironment Same Application Environment a previously {@link Network} (and
-   *                               others) was deployed.
-   * @param hostedZoneDomainName   The (sub) domain name of the hosted zone.
-   * @param applicationDomainName  The application (sub) domain.
-   * @param inputParameters        The {@link InputParameters} with optional configurations.
    *
    * @return The newly created {@link DomainStack}.
    */
   public static DomainStack newInstance(Construct scope, String id, Environment awsEnvironment,
                                         ApplicationEnvironment applicationEnvironment,
-                                        String hostedZoneDomainName, String applicationDomainName,
-                                        InputParameters inputParameters) {
-    var inParams = Objects.requireNonNull(inputParameters);
+                                        String hostedZoneDomainName, String applicationDomainName) {
     var domainStack = new DomainStack(Objects.requireNonNull(scope), Objects.requireNonNull(id),
                                       Objects.requireNonNull(awsEnvironment),
                                       Objects.requireNonNull(applicationEnvironment));
@@ -109,28 +71,13 @@ public final class DomainStack extends Stack {
     var appLoadBalancer = ApplicationLoadBalancer
         .fromApplicationLoadBalancerAttributes(domainStack, "AppLoadBalancer", albAttrs);
 
-    if (inParams.isSslCertificateActivated()) {
+    if (Network.isArnNotNull(networkParams.getSslCertificateArn())) {
       DnsValidatedCertificate.Builder.create(domainStack, "AppCertificate")
                                      .hostedZone(hostedZone)
                                      .region(awsEnvironment.getRegion())
                                      .domainName(applicationDomainName)
                                      .subjectAlternativeNames(List.of(applicationDomainName))
                                      .build();
-      var redirection = ListenerAction.redirect(RedirectOptions.builder()
-                                                               .port(inParams.getHttpsPort())
-                                                               .build());
-      var httpListener = getHttpListener(domainStack, appLoadBalancer, inParams, networkParams);
-      httpListener.addAction("RedirectHttpToHttps", AddApplicationActionProps.builder()
-                                                                             .action(redirection)
-                                                                             .build());
-      var conditions = List.of(ListenerCondition.pathPatterns(List.of("*")));
-      var appListenerRuleProps = ApplicationListenerRuleProps.builder()
-                                                             .listener(httpListener)
-                                                             .priority(1)
-                                                             .conditions(conditions)
-                                                             .action(redirection)
-                                                             .build();
-      new ApplicationListenerRule(domainStack, "HttpListenerRule", appListenerRuleProps);
     }
 
     ARecord.Builder.create(domainStack, "ARecord")
@@ -148,39 +95,5 @@ public final class DomainStack extends Stack {
                                                          .domainName(hostedZoneDomainName)
                                                          .build();
     return HostedZone.fromLookup(scope, "HostedZone", hostedZoneProviderProps);
-  }
-
-  private static ApplicationListener getHttpListener(Construct scope,
-                                                     IApplicationLoadBalancer loadBalancer,
-                                                     InputParameters inParams,
-                                                     Network.OutputParameters netOutputParams) {
-    var httpListenerName = "HttpListener";
-    if (Network.arnNotNull(netOutputParams.getHttpListenerArn())) {
-      var lookUp = ApplicationListenerLookupOptions.builder()
-                                                  .listenerArn(netOutputParams.getHttpListenerArn())
-                                                  .build();
-      return (ApplicationListener) ApplicationListener.fromLookup(scope, httpListenerName, lookUp);
-    }
-
-    return loadBalancer.addListener(httpListenerName,
-                                    BaseApplicationListenerProps.builder()
-                                                                .protocol(ApplicationProtocol.HTTP)
-                                                                .port(inParams.getHttpPortNumber())
-                                                                .build());
-  }
-
-  @lombok.Builder
-  @Getter(AccessLevel.PACKAGE)
-  public static final class InputParameters {
-    @lombok.Builder.Default
-    private boolean sslCertificateActivated = true;
-    @lombok.Builder.Default
-    private int httpPortNumber = 80;
-    @lombok.Builder.Default
-    private int httpsPortNumber = 443;
-
-    String getHttpsPort() {
-      return String.valueOf(httpsPortNumber);
-    }
   }
 }
