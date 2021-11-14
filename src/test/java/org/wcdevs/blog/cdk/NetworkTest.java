@@ -289,6 +289,7 @@ class NetworkTest {
       assertEquals(expected, output.getHttpListenerArn());
       assertEquals(expected, output.getHttpsListenerArn().orElseThrow());
       assertEquals(expected, output.getLoadbalancerSecurityGroupId());
+      assertEquals(expected, output.getSslCertificateArn());
       assertEquals(expected, output.getEcsClusterName());
       assertEquals(expected, output.getLoadBalancerArn());
       assertEquals(expected, output.getLoadBalancerDnsName());

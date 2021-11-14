@@ -74,6 +74,7 @@ public final class Network extends Construct {
   private static final String PARAM_AVAILABILITY_ZONES = "availabilityZn";
   private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNetId";
   private static final String PARAM_PUBLIC_SUBNETS = "publicSubNetId";
+  private static final String PARAM_SSL_CERTIFICATE_ARN = "sslCertificateArn";
   private static final String CONSTRUCT_NAME = "Network";
   private static final String DASH_JOINER = "-";
   // endregion
@@ -151,7 +152,7 @@ public final class Network extends Construct {
     network.setHttpListener(loadBalancerInfo.getHttpListener());
     loadBalancerInfo.getHttpsListener().ifPresent(network::setHttpsListener);
 
-    saveNetworkInfoToParameterStore(network);
+    saveNetworkInfoToParameterStore(network, inputParameters);
 
     Tags.of(network).add("environment", envName);
 
@@ -282,7 +283,7 @@ public final class Network extends Construct {
                                           .build();
   }
 
-  private static void saveNetworkInfoToParameterStore(Network network) {
+  private static void saveNetworkInfoToParameterStore(Network network, InputParameters inParams) {
     createStringParameter(network, PARAM_VPC_ID, network.getVpc().getVpcId());
     createStringParameter(network, PARAM_CLUSTER_NAME, network.getEcsCluster().getClusterName());
     createStringParameter(network, PARAM_LOAD_BALANCER_SECURITY_GROUP_ID,
@@ -300,6 +301,7 @@ public final class Network extends Construct {
                            ? network.getHttpsListener().getListenerArn()
                            : NULL_ARN_VALUE;
     createStringParameter(network, PARAM_HTTPS_LISTENER_ARN, httpsListenerArn);
+    createStringParameter(network, PARAM_SSL_CERTIFICATE_ARN, inParams.getSslCertificateArn());
 
     createStringListParameter(network, PARAM_AVAILABILITY_ZONES,
                               network.getVpc().getAvailabilityZones(),
@@ -379,6 +381,10 @@ public final class Network extends Construct {
 
   public static String getHttpsListenerArn(Construct networkScope, String environmentName) {
     return getParameter(networkScope, environmentName, PARAM_HTTPS_LISTENER_ARN);
+  }
+
+  public static String getSslCertificateArn(Construct networkScope, String environmentName) {
+    return getParameter(networkScope, environmentName, PARAM_SSL_CERTIFICATE_ARN);
   }
 
   public static List<String> getParameterList(Construct networkScope, String environmentName,
@@ -464,6 +470,7 @@ public final class Network extends Construct {
         getVPCId(scope, envName),
         getHttpListenerArn(scope, envName),
         getHttpsListenerArn(scope, envName),
+        getSslCertificateArn(scope, envName),
         getLoadBalancerSecurityGroupId(scope, envName),
         getClusterName(scope, envName),
         getIsolatedSubnets(scope, envName, totalIsolatedSubnets),
@@ -520,6 +527,7 @@ public final class Network extends Construct {
     private final String httpListenerArn;
     @Getter(AccessLevel.NONE)
     private final String httpsListenerArn;
+    private final String sslCertificateArn;
     private final String loadbalancerSecurityGroupId;
     private final String ecsClusterName;
     private final List<String> isolatedSubnets;
