@@ -295,14 +295,16 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      Network.OutputParameters output = Network.outputParametersFrom(mock(Construct.class),
-                                                                     randomString());
+      var scope = mock(Construct.class);
+      var environmentName = randomString();
+      Network.OutputParameters output = Network.outputParametersFrom(scope, environmentName);
       assertNotNull(output);
       assertEquals(expected, output.getVpcId());
       assertEquals(expected, output.getHttpListenerArn());
       assertEquals(expected, output.getHttpsListenerArn().orElseThrow());
       assertEquals(expected, output.getLoadbalancerSecurityGroupId());
       assertEquals(expected, output.getSslCertificateArn());
+      assertEquals(expected, Network.getSslCertificateArn(scope, environmentName));
       assertEquals(expected, output.getEcsClusterName());
       assertEquals(expected, output.getLoadBalancerArn());
       assertEquals(expected, output.getLoadBalancerDnsName());
