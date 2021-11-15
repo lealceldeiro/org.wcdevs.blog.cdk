@@ -1,5 +1,6 @@
 package org.wcdevs.blog.cdk;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -174,6 +175,18 @@ class NetworkTest {
       assertEquals(expected, Network.getParameter(mock(Network.class), randomString(),
                                                   randomString()));
     }
+  }
+
+  private static Stream<Arguments> getParameterReturnsNullForNullArgumentArgs() {
+    return Stream.of(arguments(null, randomString(), randomString()),
+                     arguments(mock(Network.class), null, randomString()),
+                     arguments(mock(Network.class), randomString(), null));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getParameterReturnsNullForNullArgumentArgs")
+  void getParameterReturnsNullForNullArgument(Construct scope, String environment, String id) {
+    Assertions.assertNull(Network.getParameter(scope, environment, id));
   }
 
   static Stream<Arguments> getterReturnsOK() {
