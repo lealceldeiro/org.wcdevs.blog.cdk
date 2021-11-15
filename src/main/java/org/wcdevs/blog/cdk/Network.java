@@ -317,10 +317,11 @@ public final class Network extends Construct {
   }
 
   private static void createStringParameter(Network network, String id, String stringValue) {
-    if (Objects.nonNull(network) && Objects.nonNull(id) && Objects.nonNull(stringValue)) {
+    if (Objects.nonNull(network) && Objects.nonNull(id)) {
+      var valueToStore = Objects.nonNull(stringValue) ? stringValue : NULL_ARN_VALUE;
       StringParameter.Builder.create(network, id)
                              .parameterName(parameterName(network.getEnvironmentName(), id))
-                             .stringValue(stringValue)
+                             .stringValue(valueToStore)
                              .build();
     }
   }
