@@ -317,10 +317,12 @@ public final class Network extends Construct {
   }
 
   private static void createStringParameter(Network network, String id, String stringValue) {
-    StringParameter.Builder.create(network, id)
-                           .parameterName(parameterName(network.getEnvironmentName(), id))
-                           .stringValue(stringValue)
-                           .build();
+    if (Objects.nonNull(network) && Objects.nonNull(id) && Objects.nonNull(stringValue)) {
+      StringParameter.Builder.create(network, id)
+                             .parameterName(parameterName(network.getEnvironmentName(), id))
+                             .stringValue(stringValue)
+                             .build();
+    }
   }
 
   private static <T> void createStringListParameter(Network network, String id,
@@ -343,9 +345,12 @@ public final class Network extends Construct {
 
   // region parameters store getters
   public static String getParameter(Construct networkScope, String environmentName, String id) {
-    var parameterName = parameterName(environmentName, id);
-    return StringParameter.fromStringParameterName(networkScope, id, parameterName)
-                          .getStringValue();
+    if (Objects.nonNull(networkScope) && Objects.nonNull(id) && Objects.nonNull(environmentName)) {
+      var parameterName = parameterName(environmentName, id);
+      return StringParameter.fromStringParameterName(networkScope, id, parameterName)
+                            .getStringValue();
+    }
+    return null;
   }
 
   public static String getVPCId(Construct networkScope, String environmentName) {
@@ -392,6 +397,7 @@ public final class Network extends Construct {
     return IntStream.range(0, totalElements)
                     .mapToObj(i -> getParameter(networkScope, environmentName,
                                                 idForParameterListItem(id, i)))
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toUnmodifiableList());
   }
 
