@@ -42,6 +42,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static org.wcdevs.blog.cdk.Util.DASH_JOINER;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 import static org.wcdevs.blog.cdk.Util.string;
 
@@ -70,14 +71,13 @@ public final class Network extends Construct {
   private static final String PARAM_LOAD_BALANCER_SECURITY_GROUP_ID = "lBSecGroupId";
   private static final String PARAM_LOAD_BALANCER_ARN = "lBArn";
   private static final String PARAM_LOAD_BALANCER_DNS_NAME = "lBDnsName";
-  private static final String PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID = "lBCanHostedZoneId";
+  private static final String PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID = "lBCanHostZoneId";
   private static final String PARAM_CLUSTER_NAME = "clusterName";
   private static final String PARAM_AVAILABILITY_ZONES = "availabilityZn";
-  private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNetId";
-  private static final String PARAM_PUBLIC_SUBNETS = "publicSubNetId";
+  private static final String PARAM_ISOLATED_SUBNETS = "isolatedSubNet";
+  private static final String PARAM_PUBLIC_SUBNETS = "publicSubNet";
   private static final String PARAM_SSL_CERTIFICATE_ARN = "sslCertificateArn";
   private static final String CONSTRUCT_NAME = "Network";
-  private static final String DASH_JOINER = "-";
   // endregion
 
   // region instance members
@@ -163,17 +163,16 @@ public final class Network extends Construct {
     var network = new Network(validScope, string(envName, appName, validId));
     network.setApplicationEnvironment(validAppEnv);
 
-    var vpc = vpcFrom(network, envName, appName, validInParams.getNatGatewayNumber(),
+    var vpc = vpcFrom(network, validAppEnv, validInParams.getNatGatewayNumber(),
                       validInParams.getNumberOfIsolatedSubnetsPerAZ(),
                       validInParams.getNumberOfPublicSubnetsPerAZ(),
                       validInParams.getMaxAZs());
     network.setVpc(vpc);
 
-    var clusterName = joinedString(DASH_JOINER, envName, appName, CLUSTER_NAME);
-    var cluster = clusterFrom(network, vpc, clusterName);
+    var cluster = clusterFrom(network, vpc, validAppEnv.prefixed(CLUSTER_NAME));
     network.setEcsCluster(cluster);
 
-    var loadBalancerInfo = createLoadBalancer(network, envName, appName, vpc, validInParams);
+    var loadBalancerInfo = createLoadBalancer(network, validAppEnv, vpc, validInParams);
     network.setLoadBalancerSecurityGroup(loadBalancerInfo.getSecurityGroup());
     network.setLoadBalancer(loadBalancerInfo.getApplicationLoadBalancer());
     network.setHttpListener(loadBalancerInfo.getHttpListener());
@@ -191,21 +190,21 @@ public final class Network extends Construct {
     return Cluster.Builder.create(scope, "cluster").vpc(vpc).clusterName(clusterName).build();
   }
 
-  private static IVpc vpcFrom(Construct scope, String environmentName, String applicationName,
+  private static IVpc vpcFrom(Construct scope, ApplicationEnvironment applicationEnvironment,
                               int natGatewayNumber, int numberOfIsolatedSubnetsPerAZ,
                               int numberOfPublicSubnetsPerAZ, int maxAZs) {
     if (numberOfIsolatedSubnetsPerAZ < 1 || numberOfPublicSubnetsPerAZ < 1 || maxAZs < 1) {
       throw new IllegalArgumentException("Number of private/public subnets and AZs must be >= 1");
     }
 
-    var isolatedSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, applicationName,
-                                                 "isolatedSubnet");
+    var isolatedSubnetsNamePrefix = applicationEnvironment.prefixed(PARAM_ISOLATED_SUBNETS);
     var isolatedSubnets = subnetsStreamFrom(numberOfIsolatedSubnetsPerAZ, isolatedSubnetsNamePrefix,
                                             SubnetType.ISOLATED);
-    var publicSubnetsNamePrefix = joinedString(DASH_JOINER, environmentName, applicationName,
-                                               "publicSubnet");
+
+    var publicSubnetsNamePrefix = applicationEnvironment.prefixed(PARAM_PUBLIC_SUBNETS);
     var publicSubnets = subnetsStreamFrom(numberOfPublicSubnetsPerAZ, publicSubnetsNamePrefix,
                                           SubnetType.PUBLIC);
+
     var subnetConfig = Stream.concat(isolatedSubnets, publicSubnets).collect(toList());
 
     return Vpc.Builder.create(scope, "vpc")
@@ -226,21 +225,19 @@ public final class Network extends Construct {
     return SubnetConfiguration.builder().subnetType(subnetType).name(name).build();
   }
 
-  private static LoadBalancerInfo createLoadBalancer(Construct scope, String environmentName,
-                                                     String applicationName, IVpc vpc,
-                                                     InputParameters inParams) {
-    var securityGroupName = joinedString(DASH_JOINER, environmentName, applicationName,
-                                         "loadbalancerSecurityGroup");
+  private static LoadBalancerInfo createLoadBalancer(Construct scope,
+                                                     ApplicationEnvironment applicationEnvironment,
+                                                     IVpc vpc, InputParameters inParams) {
+    var securityGroupName = applicationEnvironment.prefixed("lBSecGroup");
     var description = "Public access to the load balancer.";
-    var loadBalancerSecurityGroup = SecurityGroup.Builder.create(scope, "loadbalancerSecurityGroup")
+    var loadBalancerSecurityGroup = SecurityGroup.Builder.create(scope, securityGroupName)
                                                          .securityGroupName(securityGroupName)
                                                          .description(description)
                                                          .vpc(vpc)
                                                          .build();
     cfnSecurityGroupIngressFrom(scope, loadBalancerSecurityGroup.getSecurityGroupId());
 
-    var loadbalancerName = joinedString(DASH_JOINER, environmentName, applicationName,
-                                        "loadbalancer");
+    var loadbalancerName = applicationEnvironment.prefixed("loadbalancer");
     var loadBalancer = ApplicationLoadBalancer.Builder.create(scope, "loadbalancer")
                                                       .loadBalancerName(loadbalancerName)
                                                       .vpc(vpc)
@@ -248,10 +245,9 @@ public final class Network extends Construct {
                                                       .securityGroup(loadBalancerSecurityGroup)
                                                       .build();
 
-    var targetGroupName = joinedString(DASH_JOINER, environmentName, applicationName,
-                                       "no-op-targetGroup");
+    var targetGroupName = applicationEnvironment.prefixed("noop-tGroup");
     var targetGroup = singletonList(
-        ApplicationTargetGroup.Builder.create(scope, "targetGroup")
+        ApplicationTargetGroup.Builder.create(scope, targetGroupName)
                                       .vpc(vpc)
                                       .port(inParams.getListeningInternalHttpPort())
                                       .protocol(ApplicationProtocol.HTTP)

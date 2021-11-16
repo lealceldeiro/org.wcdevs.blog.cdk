@@ -13,6 +13,8 @@ public final class Util {
   private static final String NON_ALPHANUMERIC_VALUES = "[^a-zA-Z0-9]";
   private static final String LOWERCASE_LETTERS_ONLY = "[a-z]";
 
+  public static final String DASH_JOINER = "-";
+
   private Util() {
   }
 
