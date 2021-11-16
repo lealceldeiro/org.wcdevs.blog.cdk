@@ -18,7 +18,7 @@ To add it as a dependency from Maven Central to your project, add it to your `po
   <dependency>
     <groupId>org.wcdevs.blog</groupId>
     <artifactId>cdk</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.1</version>
   </dependency>
 </dependencies>
 ```

@@ -37,6 +37,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * Create an ECS service within and ECS cluster that is provided by a Network construct. For that:
@@ -65,7 +66,7 @@ import static java.util.Collections.emptyList;
  * @see ElasticContainerService#newInstance(Construct, String, Environment, ApplicationEnvironment, InputParameters, Network.OutputParameters)
  * @see ElasticContainerService#newDockerImage(String, String, String)
  * @see ElasticContainerService#newInputParameters(DockerImage, Map, List)
- * @see Network#outputParametersFrom(Construct, String)
+ * @see Network#outputParametersFrom(Construct, ApplicationEnvironment)
  */
 public final class ElasticContainerService extends Construct {
   private static final String ECS_TASKS_AMAZONAWS_PRINCIPAL = "ecs-tasks.amazonaws.com";
@@ -245,9 +246,9 @@ public final class ElasticContainerService extends Construct {
                                                     .actions(actions)
                                                     .build());
     var policyDocument = PolicyDocument.Builder.create().statements(statements).build();
-    var policies = Map.of(appEnv.prefixed("ecsTaskExecutionRolePolicy"), policyDocument);
+    var policies = Map.of(appEnv.prefixed("ecsTaskExecRolePolicy"), policyDocument);
 
-    return Role.Builder.create(scope, "ecsTaskExecutionRole")
+    return Role.Builder.create(scope, "ecsTaskExecRole")
                        .assumedBy(ServicePrincipal.Builder.create(ECS_TASKS_AMAZONAWS_PRINCIPAL)
                                                           .build())
                        .path("/")
@@ -438,6 +439,15 @@ public final class ElasticContainerService extends Construct {
   // endregion
 
   // region inner classes
+  public static InputParameters newInputParameters(DockerImage dockerImage) {
+    return newInputParameters(dockerImage, emptyMap(), emptyList());
+  }
+
+  public static InputParameters newInputParameters(DockerImage dockerImage,
+                                                   Map<String, String> environmentVariables) {
+    return newInputParameters(dockerImage, environmentVariables, emptyList());
+  }
+
   public static InputParameters newInputParameters(DockerImage dockerImage,
                                                    Map<String, String> environmentVariables,
                                                    List<String> secGroupIdsToGrantIngressFromEcs) {
