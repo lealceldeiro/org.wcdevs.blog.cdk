@@ -127,6 +127,22 @@ class ElasticContainerServiceTest {
   }
 
   @Test
+  void newInputParametersOverload1OK() {
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var actual = ElasticContainerService.newInputParameters(dockerImage, Map.of("k1", "v1"));
+    assertNotNull(actual);
+    assertTrue(actual.getSecurityGroupIdsToGrantIngressFromEcs().isEmpty());
+  }
+
+  @Test
+  void newInputParametersOverload2OK() {
+    var dockerImage = mock(ElasticContainerService.DockerImage.class);
+    var actual = ElasticContainerService.newInputParameters(dockerImage);
+    assertNotNull(actual);
+    assertTrue(actual.getEnvironmentVariables().isEmpty());
+  }
+
+  @Test
   void newInputParametersNPEForNullDockerImage() {
     testNewInputParametersNPE(null, Map.of("k1", "v1"), List.of("id1"));
   }
