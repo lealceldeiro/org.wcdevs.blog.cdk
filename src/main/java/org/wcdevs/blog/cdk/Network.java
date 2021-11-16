@@ -156,8 +156,8 @@ public final class Network extends Construct {
     var validScope = Objects.requireNonNull(scope);
     var validId = Objects.requireNonNull(id);
     var validAppEnv = Objects.requireNonNull(applicationEnvironment);
+    var envName = validAppEnv.getEnvironmentName();
     var appName = validAppEnv.getApplicationName();
-    var envName = validAppEnv.getApplicationName();
     var validInParams = Objects.requireNonNull(inputParameters);
 
     var network = new Network(validScope, string(envName, appName, validId));
@@ -391,13 +391,15 @@ public final class Network extends Construct {
 
   public static String getParameter(Construct scope, ApplicationEnvironment applicationEnvironment,
                                     String id) {
-    var environmentName = applicationEnvironment.getEnvironmentName();
-    var applicationName = applicationEnvironment.getApplicationName();
+    if (Objects.nonNull(applicationEnvironment) && Objects.nonNull(scope) && Objects.nonNull(id)) {
+      var environmentName = applicationEnvironment.getEnvironmentName();
+      var applicationName = applicationEnvironment.getApplicationName();
 
-    if (Objects.nonNull(scope) && Objects.nonNull(id) && Objects.nonNull(environmentName)) {
-      var parameterName = parameterName(environmentName, applicationName, id);
-      return StringParameter.fromStringParameterName(scope, id, parameterName)
-                            .getStringValue();
+      if (Objects.nonNull(environmentName) && Objects.nonNull(applicationName)) {
+        var parameterName = parameterName(environmentName, applicationName, id);
+        return StringParameter.fromStringParameterName(scope, id, parameterName)
+                              .getStringValue();
+      }
     }
     return null;
   }

@@ -180,15 +180,20 @@ class NetworkTest {
   }
 
   private static Stream<Arguments> getParameterReturnsNullForNullArgumentArgs() {
-    return Stream.of(arguments(null, randomString(), randomString()),
-                     arguments(mock(Network.class), null, randomString()),
-                     arguments(mock(Network.class), randomString(), null));
+    ApplicationEnvironment appEnvWithNullEnv = new ApplicationEnvironment(randomString(), null);
+    ApplicationEnvironment appEnvWithNullAppName = new ApplicationEnvironment(null, randomString());
+    ApplicationEnvironment okAppEnv = new ApplicationEnvironment(randomString(), randomString());
+
+    return Stream.of(arguments(null, okAppEnv, randomString()),
+                     arguments(mock(Network.class), appEnvWithNullEnv, randomString()),
+                     arguments(mock(Network.class), appEnvWithNullAppName, randomString()),
+                     arguments(mock(Network.class), okAppEnv, null));
   }
 
   @ParameterizedTest
   @MethodSource("getParameterReturnsNullForNullArgumentArgs")
-  void getParameterReturnsNullForNullArgument(Construct scope, String environment, String id) {
-    var appEnv = Network.defaultNetworkApplicationEnvironment(environment);
+  void getParameterReturnsNullForNullArgument(Construct scope, ApplicationEnvironment appEnv,
+                                              String id) {
     Assertions.assertNull(Network.getParameter(scope, appEnv, id));
   }
 
