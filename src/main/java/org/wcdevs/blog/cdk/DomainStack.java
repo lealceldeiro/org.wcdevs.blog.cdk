@@ -59,8 +59,7 @@ public final class DomainStack extends Stack {
                                       Objects.requireNonNull(applicationEnvironment));
 
     var hostedZone = hostedZone(domainStack, Objects.requireNonNull(hostedZoneDomainName));
-    var networkParams = Network.outputParametersFrom(domainStack,
-                                                     applicationEnvironment.getEnvironmentName());
+    var networkParams = Network.outputParametersFrom(domainStack, applicationEnvironment);
     var albAttrs = ApplicationLoadBalancerAttributes
         .builder()
         .loadBalancerArn(networkParams.getLoadBalancerArn())
