@@ -42,6 +42,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.wcdevs.blog.cdk.Util.DASH_JOINER;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 import static software.amazon.awscdk.customresources.AwsCustomResourcePolicy.ANY_RESOURCE;
 
@@ -54,7 +55,6 @@ public final class CognitoStack extends Stack {
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
   private static final String CONSTRUCT_NAME = "cognito";
-  private static final String DASH_JOINER = "-";
 
   public static final String USER_POOL_CLIENT_SECRET_HOLDER = "userPoolClientSecretValue";
 

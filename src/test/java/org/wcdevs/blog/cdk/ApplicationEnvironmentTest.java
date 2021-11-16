@@ -26,7 +26,7 @@ class ApplicationEnvironmentTest {
     var env = randomString();
 
     var appEnv = new ApplicationEnvironment(app, env);
-    assertEquals(Util.sanitize(Util.joinedString("-", app, env)), appEnv.toString());
+    assertEquals(Util.sanitize(Util.joinedString(Util.DASH_JOINER, env, app)), appEnv.toString());
   }
 
   @Test
