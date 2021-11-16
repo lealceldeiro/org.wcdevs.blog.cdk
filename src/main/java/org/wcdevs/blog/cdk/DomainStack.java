@@ -30,10 +30,12 @@ import java.util.Objects;
  * </ul>
  */
 public final class DomainStack extends Stack {
+  private static final String CONSTRUCT_NAME = "domain-stack";
+
   private DomainStack(Construct scope, String id, Environment awsEnvironment,
                       ApplicationEnvironment applicationEnvironment) {
     super(scope, id, StackProps.builder()
-                               .stackName(applicationEnvironment.prefixed("Domain"))
+                               .stackName(applicationEnvironment.prefixed(CONSTRUCT_NAME))
                                .env(awsEnvironment)
                                .build());
   }

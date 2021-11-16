@@ -13,11 +13,11 @@ public final class ApplicationEnvironment {
 
   @Override
   public String toString() {
-    return Util.sanitize(Util.joinedString("-", applicationName, environmentName));
+    return Util.sanitize(Util.joinedString(Util.DASH_JOINER, environmentName, applicationName));
   }
 
   public String prefixed(String string) {
-    return Util.joinedString("-", this, string);
+    return Util.joinedString(Util.DASH_JOINER, this, string);
   }
 
   public void tag(IConstruct construct) {
