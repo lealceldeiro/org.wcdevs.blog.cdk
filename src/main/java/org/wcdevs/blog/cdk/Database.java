@@ -77,8 +77,7 @@ public final class Database extends Construct {
 
     // retrieve network output params from SSM
     // IVpc#fromLookup is broken (https://github.com/aws/aws-cdk/issues/3600)
-    var netOutParams = Network.outputParametersFrom(database,
-                                                    applicationEnvironment.getEnvironmentName());
+    var netOutParams = Network.outputParametersFrom(database, applicationEnvironment);
     var availabilityZones = netOutParams.getAvailabilityZones();
     if (availabilityZones == null || availabilityZones.isEmpty()) {
       throw new IllegalArgumentException("No availability zones in network");

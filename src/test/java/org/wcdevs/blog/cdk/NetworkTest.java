@@ -156,8 +156,9 @@ class NetworkTest {
             .thenReturn(numberOfIsolatedSubnetsPerAZ);
         when(inputParams.getNumberOfPublicSubnetsPerAZ()).thenReturn(numberPublicSubnetsPerAZ);
         when(inputParams.getNatGatewayNumber()).thenReturn(natGatewayNumber);
+        var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
 
-        var actual = Network.newInstance(scope, randomString(), randomString(), inputParams);
+        var actual = Network.newInstance(scope, randomString(), appEnv, inputParams);
         assertNotNull(actual);
       }
     });
@@ -172,25 +173,32 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      assertEquals(expected, Network.getParameter(mock(Network.class), randomString(),
-                                                  randomString()));
+      var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
+
+      assertEquals(expected, Network.getParameter(mock(Network.class), appEnv, randomString()));
     }
   }
 
   private static Stream<Arguments> getParameterReturnsNullForNullArgumentArgs() {
-    return Stream.of(arguments(null, randomString(), randomString()),
-                     arguments(mock(Network.class), null, randomString()),
-                     arguments(mock(Network.class), randomString(), null));
+    ApplicationEnvironment appEnvWithNullEnv = new ApplicationEnvironment(randomString(), null);
+    ApplicationEnvironment appEnvWithNullAppName = new ApplicationEnvironment(null, randomString());
+    ApplicationEnvironment okAppEnv = new ApplicationEnvironment(randomString(), randomString());
+
+    return Stream.of(arguments(null, okAppEnv, randomString()),
+                     arguments(mock(Network.class), appEnvWithNullEnv, randomString()),
+                     arguments(mock(Network.class), appEnvWithNullAppName, randomString()),
+                     arguments(mock(Network.class), okAppEnv, null));
   }
 
   @ParameterizedTest
   @MethodSource("getParameterReturnsNullForNullArgumentArgs")
-  void getParameterReturnsNullForNullArgument(Construct scope, String environment, String id) {
-    Assertions.assertNull(Network.getParameter(scope, environment, id));
+  void getParameterReturnsNullForNullArgument(Construct scope, ApplicationEnvironment appEnv,
+                                              String id) {
+    Assertions.assertNull(Network.getParameter(scope, appEnv, id));
   }
 
   static Stream<Arguments> getterReturnsOK() {
-    BiFunction<Construct, String, String> getVPCId = Network::getVPCId,
+    BiFunction<Construct, ApplicationEnvironment, String> getVPCId = Network::getVPCId,
         getClusterName = Network::getClusterName,
         getLoadBalancerSecurityGroupId = Network::getLoadBalancerSecurityGroupId,
         getLoadBalancerArn = Network::getLoadBalancerArn,
@@ -208,7 +216,7 @@ class NetworkTest {
 
   @ParameterizedTest
   @MethodSource("getterReturnsOK")
-  <T> void getterReturnsOK(BiFunction<? super Construct, ? super String, ? extends String> netFn) {
+  <T> void getterReturnsOK(BiFunction<? super Construct, ? super ApplicationEnvironment, ? extends String> netFn) {
     var expected = randomString();
 
     var stringParamMock = mock(IStringParameter.class);
@@ -217,7 +225,8 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      assertEquals(expected, netFn.apply(mock(Network.class), randomString()));
+      var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
+      assertEquals(expected, netFn.apply(mock(Network.class), appEnv));
     }
   }
 
@@ -231,7 +240,8 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      List<String> actual = Network.getParameterList(mock(Network.class), randomString(),
+      var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
+      List<String> actual = Network.getParameterList(mock(Network.class), appEnv,
                                                      randomString(), 2);
 
       assertEquals(expected1, actual.get(0));
@@ -239,7 +249,7 @@ class NetworkTest {
     }
   }
 
-  void testGetParameterList(TriFunction<? super Construct, ? super String, ? super Integer, ? extends List<String>> networkMethod,
+  void testGetParameterList(TriFunction<? super Construct, ? super ApplicationEnvironment, ? super Integer, ? extends List<String>> networkMethod,
                             IVpc iVpcMock) {
     int numberOfElements = 2;
     var stringParamMock = mock(IStringParameter.class);
@@ -254,7 +264,8 @@ class NetworkTest {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
 
-      List<String> actual = networkMethod.apply(networkMock, randomString(), numberOfElements);
+      var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
+      List<String> actual = networkMethod.apply(networkMock, appEnv, numberOfElements);
 
       assertEquals(expected1, actual.get(0));
       assertEquals(expected2, actual.get(1));
@@ -295,14 +306,16 @@ class NetworkTest {
     try (var mockedStringParameter = mockStatic(StringParameter.class)) {
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParamMock);
-      Network.OutputParameters output = Network.outputParametersFrom(mock(Construct.class),
-                                                                     randomString());
+      var scope = mock(Construct.class);
+      var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
+      Network.OutputParameters output = Network.outputParametersFrom(scope, appEnv);
       assertNotNull(output);
       assertEquals(expected, output.getVpcId());
       assertEquals(expected, output.getHttpListenerArn());
       assertEquals(expected, output.getHttpsListenerArn().orElseThrow());
       assertEquals(expected, output.getLoadbalancerSecurityGroupId());
       assertEquals(expected, output.getSslCertificateArn());
+      assertEquals(expected, Network.getSslCertificateArn(scope, appEnv));
       assertEquals(expected, output.getEcsClusterName());
       assertEquals(expected, output.getLoadBalancerArn());
       assertEquals(expected, output.getLoadBalancerDnsName());
@@ -327,8 +340,9 @@ class NetworkTest {
   void outputParametersFromThrowsWithIllegalArgs(int numberOfIsolatedSubnetsPerAz,
                                                  int numberOfPublicSubnetsPerAz,
                                                  int totalAvailabilityZones) {
+    var appEnv = Network.defaultNetworkApplicationEnvironment(randomString());
     Executable executable = () -> Network.outputParametersFrom(mock(Construct.class),
-                                                               randomString(),
+                                                               appEnv,
                                                                numberOfIsolatedSubnetsPerAz,
                                                                numberOfPublicSubnetsPerAz,
                                                                totalAvailabilityZones);
