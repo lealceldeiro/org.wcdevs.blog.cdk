@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.ISubnet;
@@ -55,9 +54,9 @@ import static org.wcdevs.blog.cdk.Util.string;
  * The construct exposes some output parameters to be used by other constructs.
  * </p>
  *
- * @see Network#newInstance(Construct, String, String, InputParameters)
- * @see Network#outputParametersFrom(Construct, String)
- * @see Network#outputParametersFrom(Construct, String, String)
+ * @see Network#newInstance(Construct, String, ApplicationEnvironment, InputParameters)
+ * @see Network#outputParametersFrom(Construct, ApplicationEnvironment)
+ * @see Network#outputParametersFrom(Construct, ApplicationEnvironment, int, int, int)
  */
 @Setter(AccessLevel.PRIVATE)
 @Getter(AccessLevel.PACKAGE)
@@ -82,8 +81,7 @@ public final class Network extends Construct {
   // endregion
 
   // region instance members
-  private String environmentName;
-  private String applicationName;
+  private ApplicationEnvironment applicationEnvironment;
   private IVpc vpc;
   private ICluster ecsCluster;
   private ISecurityGroup loadBalancerSecurityGroup;
@@ -121,44 +119,49 @@ public final class Network extends Construct {
   }
 
   /**
-   * Creates a new {@link Network} from a given scope, network id, environment name and
-   * input parameters.
+   * Creates a new {@link ApplicationEnvironment} from a given environment with a default
+   * application name.
+   * <p>
+   * This is the equivalent to:
+   * {@code new ApplicationEnvironment(Network.DEFAULT_APPLICATION_NAME, environment)}
+   * </p>
    *
-   * @param scope           Scope in which the network will be defined.
-   * @param id              Network id.
-   * @param environmentName Environment name.
-   * @param inputParameters Input parameters to build the network.
+   * @param environment Environment name.
    *
-   * @return The newly create network.
+   * @return The newly create {@link ApplicationEnvironment}.
+   *
+   * @see Network#DEFAULT_APPLICATION_NAME
    */
-  public static Network newInstance(Construct scope, String id, String environmentName,
-                                    InputParameters inputParameters) {
-    return newInstance(scope, id, environmentName, DEFAULT_APPLICATION_NAME, inputParameters);
+  public static ApplicationEnvironment defaultNetworkApplicationEnvironment(String environment) {
+    return new ApplicationEnvironment(DEFAULT_APPLICATION_NAME, environment);
   }
 
   /**
    * Creates a new {@link Network} from a given scope, network id, environment name, application
    * name and input parameters.
    *
-   * @param scope           Scope in which the network will be defined.
-   * @param id              Network id.
-   * @param environmentName Environment name.
-   * @param applicationName Name of the application to create the Network for.
-   * @param inputParameters Input parameters to build the network.
+   * @param scope                  Scope in which the network will be defined.
+   * @param id                     Network id.
+   * @param applicationEnvironment {@link ApplicationEnvironment} instance holding the app and
+   *                               environment names.
+   * @param inputParameters        Input parameters to build the network.
    *
    * @return The newly create network.
+   *
+   * @see Network#defaultNetworkApplicationEnvironment(String)
    */
-  public static Network newInstance(Construct scope, String id, String environmentName,
-                                    String applicationName, InputParameters inputParameters) {
+  public static Network newInstance(Construct scope, String id,
+                                    ApplicationEnvironment applicationEnvironment,
+                                    InputParameters inputParameters) {
     var validScope = Objects.requireNonNull(scope);
     var validId = Objects.requireNonNull(id);
-    var appName = Optional.ofNullable(applicationName).orElse(DEFAULT_APPLICATION_NAME);
-    var envName = Objects.requireNonNull(environmentName);
+    var validAppEnv = Objects.requireNonNull(applicationEnvironment);
+    var appName = validAppEnv.getApplicationName();
+    var envName = validAppEnv.getApplicationName();
     var validInParams = Objects.requireNonNull(inputParameters);
 
-    var network = new Network(validScope, string(appName, validId));
-    network.setEnvironmentName(envName);
-    network.setApplicationName(appName);
+    var network = new Network(validScope, string(envName, appName, validId));
+    network.setApplicationEnvironment(validAppEnv);
 
     var vpc = vpcFrom(network, envName, appName, validInParams.getNatGatewayNumber(),
                       validInParams.getNumberOfIsolatedSubnetsPerAZ(),
@@ -178,8 +181,7 @@ public final class Network extends Construct {
 
     saveNetworkInfoToParameterStore(network, inputParameters);
 
-    Tags.of(network).add("environment", envName);
-    Tags.of(network).add("application", appName);
+    applicationEnvironment.tag(network);
 
     return network;
   }
@@ -359,6 +361,14 @@ public final class Network extends Construct {
     }
   }
 
+  private String getEnvironmentName() {
+    return getApplicationEnvironment().getEnvironmentName();
+  }
+
+  private String getApplicationName() {
+    return getApplicationEnvironment().getApplicationName();
+  }
+
   private static <T> void createStringListParameter(Network network, String id,
                                                     List<? extends T> values,
                                                     Function<T, String> mapper) {
@@ -378,159 +388,93 @@ public final class Network extends Construct {
   // endregion
 
   // region parameters store getters
-  public static String getParameter(Construct networkScope, String environmentName, String id) {
-    return getParameter(networkScope, environmentName, DEFAULT_APPLICATION_NAME, id);
-  }
 
-  public static String getParameter(Construct networkScope, String environmentName,
-                                    String applicationName, String id) {
-    if (Objects.nonNull(networkScope) && Objects.nonNull(id) && Objects.nonNull(environmentName)) {
+  public static String getParameter(Construct scope, ApplicationEnvironment applicationEnvironment,
+                                    String id) {
+    var environmentName = applicationEnvironment.getEnvironmentName();
+    var applicationName = applicationEnvironment.getApplicationName();
+
+    if (Objects.nonNull(scope) && Objects.nonNull(id) && Objects.nonNull(environmentName)) {
       var parameterName = parameterName(environmentName, applicationName, id);
-      return StringParameter.fromStringParameterName(networkScope, id, parameterName)
+      return StringParameter.fromStringParameterName(scope, id, parameterName)
                             .getStringValue();
     }
     return null;
   }
 
-  public static String getVPCId(Construct networkScope, String environmentName) {
-    return getVPCId(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
+  public static String getVPCId(Construct scope, ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_VPC_ID);
   }
 
-  public static String getVPCId(Construct networkScope, String environmentName,
-                                String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_VPC_ID);
+  public static String getClusterName(Construct scope,
+                                      ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_CLUSTER_NAME);
   }
 
-  public static String getClusterName(Construct networkScope, String environmentName) {
-    return getClusterName(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  public static String getClusterName(Construct networkScope, String environmentName,
-                                      String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_CLUSTER_NAME);
-  }
-
-  public static String getLoadBalancerSecurityGroupId(Construct networkScope,
-                                                      String environmentName) {
-    return getLoadBalancerSecurityGroupId(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  public static String getLoadBalancerSecurityGroupId(Construct networkScope,
-                                                      String environmentName,
-                                                      String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName,
+  public static String getLoadBalancerSecurityGroupId(Construct scope,
+                                                      ApplicationEnvironment appEnvironment) {
+    return getParameter(scope, appEnvironment,
                         PARAM_LOAD_BALANCER_SECURITY_GROUP_ID);
   }
 
-  public static String getLoadBalancerArn(Construct networkScope, String environmentName) {
-    return getLoadBalancerArn(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
+  public static String getLoadBalancerArn(Construct scope,
+                                          ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_LOAD_BALANCER_ARN);
   }
 
-  public static String getLoadBalancerArn(Construct networkScope, String environmentName,
-                                          String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_LOAD_BALANCER_ARN);
+  public static String getLoadBalancerDnsName(Construct scope,
+                                              ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_LOAD_BALANCER_DNS_NAME);
   }
 
-  public static String getLoadBalancerDnsName(Construct networkScope, String environmentName) {
-    return getLoadBalancerDnsName(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
+  public static String getLoadBalancerCanonicalHostedZoneId(Construct scope,
+                                                            ApplicationEnvironment appEnvironment) {
+    return getParameter(scope, appEnvironment, PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID);
   }
 
-  public static String getLoadBalancerDnsName(Construct networkScope, String environmentName,
-                                              String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName,
-                        PARAM_LOAD_BALANCER_DNS_NAME);
+  public static String getHttpListenerArn(Construct scope,
+                                          ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_HTTP_LISTENER_ARN);
   }
 
-  public static String getLoadBalancerCanonicalHostedZoneId(Construct networkScope,
-                                                            String environmentName) {
-    return getLoadBalancerCanonicalHostedZoneId(networkScope, environmentName,
-                                                DEFAULT_APPLICATION_NAME);
+  public static String getHttpsListenerArn(Construct scope,
+                                           ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_HTTPS_LISTENER_ARN);
   }
 
-  public static String getLoadBalancerCanonicalHostedZoneId(Construct networkScope,
-                                                            String environmentName,
-                                                            String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName,
-                        PARAM_LOAD_BALANCER_CANONICAL_HOSTED_ZONE_ID);
+  public static String getSslCertificateArn(Construct scope,
+                                            ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_SSL_CERTIFICATE_ARN);
   }
 
-  public static String getHttpListenerArn(Construct networkScope, String environmentName) {
-    return getHttpListenerArn(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  public static String getHttpListenerArn(Construct networkScope, String environmentName,
-                                          String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_HTTP_LISTENER_ARN);
-  }
-
-  public static String getHttpsListenerArn(Construct networkScope, String environmentName) {
-    return getHttpsListenerArn(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  public static String getHttpsListenerArn(Construct networkScope, String environmentName,
-                                           String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_HTTPS_LISTENER_ARN);
-  }
-
-  public static String getSslCertificateArn(Construct networkScope, String environmentName) {
-    return getSslCertificateArn(networkScope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  public static String getSslCertificateArn(Construct networkScope, String environmentName,
-                                            String applicationName) {
-    return getParameter(networkScope, environmentName, applicationName, PARAM_SSL_CERTIFICATE_ARN);
-  }
-
-  public static List<String> getParameterList(Construct networkScope, String environmentName,
+  public static List<String> getParameterList(Construct scope,
+                                              ApplicationEnvironment applicationEnvironment,
                                               String id, int totalElements) {
-    return getParameterList(networkScope, environmentName, DEFAULT_APPLICATION_NAME, id,
-                            totalElements);
-  }
-
-  public static List<String> getParameterList(Construct networkScope, String environmentName,
-                                              String applicationName, String id,
-                                              int totalElements) {
     return IntStream.range(0, totalElements)
-                    .mapToObj(i -> getParameter(networkScope, environmentName, applicationName,
+                    .mapToObj(i -> getParameter(scope, applicationEnvironment,
                                                 idForParameterListItem(id, i)))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toUnmodifiableList());
   }
 
-  public static List<String> getAvailabilityZones(Construct networkScope, String environmentName,
+  public static List<String> getAvailabilityZones(Construct scope,
+                                                  ApplicationEnvironment applicationEnvironment,
                                                   int totalAvailabilityZones) {
-    return getAvailabilityZones(networkScope, environmentName, DEFAULT_APPLICATION_NAME,
-                                totalAvailabilityZones);
-  }
-
-  public static List<String> getAvailabilityZones(Construct networkScope, String environmentName,
-                                                  String applicationName,
-                                                  int totalAvailabilityZones) {
-    return getParameterList(networkScope, environmentName, applicationName,
+    return getParameterList(scope, applicationEnvironment,
                             PARAM_AVAILABILITY_ZONES, totalAvailabilityZones);
   }
 
-  public static List<String> getIsolatedSubnets(Construct networkScope, String environmentName,
+  public static List<String> getIsolatedSubnets(Construct scope,
+                                                ApplicationEnvironment applicationEnvironment,
                                                 int totalIsolatedSubnets) {
-    return getIsolatedSubnets(networkScope, environmentName, DEFAULT_APPLICATION_NAME,
-                              totalIsolatedSubnets);
-  }
-
-  public static List<String> getIsolatedSubnets(Construct networkScope, String environmentName,
-                                                String applicationName, int totalIsolatedSubnets) {
-    return getParameterList(networkScope, environmentName, applicationName, PARAM_ISOLATED_SUBNETS,
+    return getParameterList(scope, applicationEnvironment, PARAM_ISOLATED_SUBNETS,
                             totalIsolatedSubnets);
   }
 
-  public static List<String> getPublicSubnets(Construct networkScope, String environmentName,
+  public static List<String> getPublicSubnets(Construct networkScope,
+                                              ApplicationEnvironment applicationEnvironment,
                                               int totalPublicSubnets) {
-    return getPublicSubnets(networkScope, environmentName, DEFAULT_APPLICATION_NAME,
-                            totalPublicSubnets);
-  }
-
-  public static List<String> getPublicSubnets(Construct networkScope, String environmentName,
-                                              String applicationName, int totalPublicSubnets) {
-    return getParameterList(networkScope, environmentName, applicationName, PARAM_PUBLIC_SUBNETS,
+    return getParameterList(networkScope, applicationEnvironment, PARAM_PUBLIC_SUBNETS,
                             totalPublicSubnets);
   }
   // endregion
@@ -541,33 +485,18 @@ public final class Network extends Construct {
    * Returns a {@link Network} output parameters generated by a previously constructed
    * {@link Network} instance.
    *
-   * @param scope           Scope construct to be provided to the SSM to retrieve the parameters.
-   * @param environmentName Name of the environment where the {@link Network} instance was
-   *                        deployed.
+   * @param scope          Scope construct to be provided to the SSM to retrieve the parameters.
+   * @param appEnvironment {@link ApplicationEnvironment} instance holding the name of the
+   *                       application and the environment where the
+   *                       {@link Network} instance was deployed.
    *
    * @return An {@link OutputParameters} instance containing the parameters from the SSM.
+   *
+   * @see Network#defaultNetworkApplicationEnvironment(String)
    */
   public static OutputParameters outputParametersFrom(Construct scope,
-                                                      String environmentName) {
-    return outputParametersFrom(scope, environmentName, DEFAULT_APPLICATION_NAME);
-  }
-
-  /**
-   * Returns a {@link Network} output parameters generated by a previously constructed
-   * {@link Network} instance.
-   *
-   * @param scope           Scope construct to be provided to the SSM to retrieve the parameters.
-   * @param environmentName Name of the environment where the {@link Network} instance was
-   *                        deployed.
-   * @param applicationName Name of the application for which the {@link Network} instance was
-   *                        deployed.
-   *
-   * @return An {@link OutputParameters} instance containing the parameters from the SSM.
-   */
-  public static OutputParameters outputParametersFrom(Construct scope,
-                                                      String environmentName,
-                                                      String applicationName) {
-    return outputParametersFrom(scope, environmentName, applicationName,
+                                                      ApplicationEnvironment appEnvironment) {
+    return outputParametersFrom(scope, appEnvironment,
                                 DEFAULT_NUMBER_OF_ISOLATED_SUBNETS_PER_AZ,
                                 DEFAULT_NUMBER_OF_PUBLIC_SUBNETS_PER_AZ,
                                 DEFAULT_NUMBER_OF_AZ);
@@ -579,8 +508,9 @@ public final class Network extends Construct {
    *
    * @param networkScope                 Scope where the network instance to retrieve the
    *                                     parameters from the SSM was deployed.
-   * @param environmentName              Name of the environment where the {@link Network} instance
-   *                                     was deployed.
+   * @param appEnvironment               {@link ApplicationEnvironment} instance holding the name
+   *                                     of the application and the environment where the
+   *                                     {@link Network} instance was deployed.
    * @param numberOfIsolatedSubnetsPerAz Number of isolated subnets per AZ in the deployed network.
    * @param numberOfPublicSubnetsPerAz   Number of public subnets per AZ in the deployed network.
    * @param totalAvailabilityZones       Number of total availability zones in the deployed network.
@@ -588,40 +518,11 @@ public final class Network extends Construct {
    * @return An {@link OutputParameters} instance containing the parameters from the SSM.
    */
   public static OutputParameters outputParametersFrom(Construct networkScope,
-                                                      String environmentName,
-                                                      int numberOfIsolatedSubnetsPerAz,
-                                                      int numberOfPublicSubnetsPerAz,
-                                                      int totalAvailabilityZones) {
-    return outputParametersFrom(networkScope, environmentName, DEFAULT_APPLICATION_NAME,
-                                numberOfIsolatedSubnetsPerAz, numberOfPublicSubnetsPerAz,
-                                totalAvailabilityZones);
-  }
-
-  /**
-   * Returns the network output parameters generated by a construct where the {@link Network}
-   * instance was previously deployed.
-   *
-   * @param networkScope                 Scope where the network instance to retrieve the
-   *                                     parameters from the SSM was deployed.
-   * @param environmentName              Name of the environment where the {@link Network} instance
-   *                                     was deployed.
-   * @param applicationName              Name of the application for which the {@link Network}
-   *                                     instance was deployed.
-   * @param numberOfIsolatedSubnetsPerAz Number of isolated subnets per AZ in the deployed network.
-   * @param numberOfPublicSubnetsPerAz   Number of public subnets per AZ in the deployed network.
-   * @param totalAvailabilityZones       Number of total availability zones in the deployed network.
-   *
-   * @return An {@link OutputParameters} instance containing the parameters from the SSM.
-   */
-  public static OutputParameters outputParametersFrom(Construct networkScope,
-                                                      String environmentName,
-                                                      String applicationName,
+                                                      ApplicationEnvironment appEnvironment,
                                                       int numberOfIsolatedSubnetsPerAz,
                                                       int numberOfPublicSubnetsPerAz,
                                                       int totalAvailabilityZones) {
     var scope = Objects.requireNonNull(networkScope);
-    var envName = Objects.requireNonNull(environmentName);
-    var appName = Objects.requireNonNull(applicationName);
     if (numberOfIsolatedSubnetsPerAz < 1 || numberOfPublicSubnetsPerAz < 1
         || totalAvailabilityZones < 1) {
       throw new IllegalArgumentException("The number of isolated and public subnets and the "
@@ -634,18 +535,18 @@ public final class Network extends Construct {
     int totalPublicSubnets = numberOfPublicSubnetsPerAz * totalAvailabilityZones;
 
     return new OutputParameters(
-        getVPCId(scope, envName, appName),
-        getHttpListenerArn(scope, envName, appName),
-        getHttpsListenerArn(scope, envName, appName),
-        getSslCertificateArn(scope, envName, appName),
-        getLoadBalancerSecurityGroupId(scope, envName, appName),
-        getClusterName(scope, envName, appName),
-        getIsolatedSubnets(scope, envName, appName, totalIsolatedSubnets),
-        getPublicSubnets(scope, envName, appName, totalPublicSubnets),
-        getAvailabilityZones(scope, envName, appName, totalAvailabilityZones),
-        getLoadBalancerArn(scope, envName, appName),
-        getLoadBalancerDnsName(scope, envName, appName),
-        getLoadBalancerCanonicalHostedZoneId(scope, envName, appName)
+        getVPCId(scope, appEnvironment),
+        getHttpListenerArn(scope, appEnvironment),
+        getHttpsListenerArn(scope, appEnvironment),
+        getSslCertificateArn(scope, appEnvironment),
+        getLoadBalancerSecurityGroupId(scope, appEnvironment),
+        getClusterName(scope, appEnvironment),
+        getIsolatedSubnets(scope, appEnvironment, totalIsolatedSubnets),
+        getPublicSubnets(scope, appEnvironment, totalPublicSubnets),
+        getAvailabilityZones(scope, appEnvironment, totalAvailabilityZones),
+        getLoadBalancerArn(scope, appEnvironment),
+        getLoadBalancerDnsName(scope, appEnvironment),
+        getLoadBalancerCanonicalHostedZoneId(scope, appEnvironment)
     );
   }
 
