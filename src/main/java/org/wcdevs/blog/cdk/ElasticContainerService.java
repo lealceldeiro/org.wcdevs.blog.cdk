@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -301,14 +302,12 @@ public final class ElasticContainerService extends Construct {
                                                             .options(logConfOptions)
                                                             .build();
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-containerdefinitions-portmappings.html
-    var portMappings = List.of(
-        CfnTaskDefinition.PortMappingProperty.builder()
-                                             .containerPort(params.getApplicationPort())
-                                             .build(),
-        CfnTaskDefinition.PortMappingProperty.builder()
-                                             .containerPort(params.getHealthCheckPort())
-                                             .build()
-                              );
+    var portMappings = Stream.of(params.getApplicationPort(), params.getHealthCheckPort())
+                             .distinct()
+                             .map(port -> CfnTaskDefinition.PortMappingProperty.builder()
+                                                                               .containerPort(port)
+                                                                               .build())
+                             .collect(Collectors.toList());
     var environmentVars = cfnTaskDefKeyValuePropertiesFrom(params.getEnvironmentVariables());
 
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
@@ -344,9 +343,9 @@ public final class ElasticContainerService extends Construct {
                                                  .build();
   }
 
-  private static CfnTaskDefinition taskDefinition(
-      Construct scope, InputParameters params, IRole ecsTaskExecutionRole, IRole ecsTaskRole,
-      CfnTaskDefinition.ContainerDefinitionProperty containerDef
+  private static CfnTaskDefinition taskDefinition(Construct scope, InputParameters params,
+                                                  IRole ecsTaskExecutionRole, IRole ecsTaskRole,
+                                                  CfnTaskDefinition.ContainerDefinitionProperty prop
                                                  ) {
     return CfnTaskDefinition.Builder.create(scope, "taskDefinition")
                                     .cpu(String.valueOf(params.getCpu()))
@@ -356,7 +355,7 @@ public final class ElasticContainerService extends Construct {
                                     .requiresCompatibilities(List.of(LUNCH_TYPE_FARGATE))
                                     .executionRoleArn(ecsTaskExecutionRole.getRoleArn())
                                     .taskRoleArn(ecsTaskRole.getRoleArn())
-                                    .containerDefinitions(List.of(containerDef))
+                                    .containerDefinitions(List.of(prop))
                                     .build();
   }
 
