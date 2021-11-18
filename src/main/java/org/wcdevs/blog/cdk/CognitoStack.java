@@ -66,35 +66,34 @@ public final class CognitoStack extends Stack {
                                          ApplicationEnvironment applicationEnvironment,
                                          InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
+    var appEnv = Objects.requireNonNull(applicationEnvironment);
     var region = Objects.requireNonNull(awsEnvironment.getRegion());
 
-    var stackName = applicationEnvironment.prefixed(CONSTRUCT_NAME);
+    var stackName = appEnv.prefixed(joinedString(DASH_JOINER, id, CONSTRUCT_NAME));
     var cognitoPros = StackProps.builder()
                                 .stackName(stackName)
                                 .env(awsEnvironment)
                                 .build();
     var cognitoStack = new CognitoStack(scope, stackName, cognitoPros);
 
-    var userPool = userPool(cognitoStack, inParams);
+    var userPool = userPool(cognitoStack, inParams, appEnv);
     var userPoolClient = userPoolClient(cognitoStack, userPool, inParams);
     var logoutUrl = inParams.getFullLogoutUrlForRegion(region);
 
     createUserPoolDomain(cognitoStack, userPool, inParams);
 
-    var secretName = applicationEnvironment.prefixed(USER_POOL_CLIENT_SECRET);
+    var secretName = appEnv.prefixed(USER_POOL_CLIENT_SECRET);
     var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
                                                     userPoolClient.getUserPoolClientId(),
                                                     secretName);
 
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_ID,
-                          userPool.getUserPoolId());
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID,
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_ID, userPool.getUserPoolId());
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_ID,
                           userPoolClient.getUserPoolClientId());
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_CLIENT_SECRET_ARN,
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_SECRET_ARN,
                           userPoolClientSecret.getSecretArn());
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_LOGOUT_URL,
-                          logoutUrl);
-    createStringParameter(cognitoStack, applicationEnvironment, PARAM_USER_POOL_PROVIDER_URL,
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL, logoutUrl);
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_PROVIDER_URL,
                           userPool.getUserPoolProviderUrl());
 
     return cognitoStack;
@@ -106,7 +105,8 @@ public final class CognitoStack extends Stack {
   }
 
   // region helpers
-  private static UserPool userPool(Construct scope, InputParameters inParams) {
+  private static UserPool userPool(Construct scope, InputParameters inParams,
+                                   ApplicationEnvironment applicationEnvironment) {
     var autoVerifyEmail = AutoVerifiedAttrs.builder()
                                            .email(inParams.isSignInAutoVerifyEmail())
                                            .phone(inParams.isSignInAutoVerifyPhone())
@@ -138,7 +138,7 @@ public final class CognitoStack extends Stack {
                                        .tempPasswordValidity(tempPasswordValidityDays)
                                        .build();
     return UserPool.Builder.create(scope, "userPool")
-                           .userPoolName(inParams.getApplicationName() + "-user-pool")
+                           .userPoolName(applicationEnvironment.prefixed("user-pool"))
                            .selfSignUpEnabled(inParams.isSelfSignUpEnabled())
                            .accountRecovery(inParams.getAccountRecovery())
                            .autoVerify(autoVerifyEmail)
@@ -173,15 +173,15 @@ public final class CognitoStack extends Stack {
                                  .build();
   }
 
-  private static UserPoolDomain createUserPoolDomain(Construct scope, IUserPool userPool,
-                                                     InputParameters inParams) {
+  private static void createUserPoolDomain(Construct scope, IUserPool userPool,
+                                           InputParameters inParams) {
     var cognitoDomain = CognitoDomainOptions.builder()
                                             .domainPrefix(inParams.getLoginPageDomainPrefix())
                                             .build();
-    return UserPoolDomain.Builder.create(scope, "userPoolDomain")
-                                 .userPool(userPool)
-                                 .cognitoDomain(cognitoDomain)
-                                 .build();
+    UserPoolDomain.Builder.create(scope, "userPoolDomain")
+                          .userPool(userPool)
+                          .cognitoDomain(cognitoDomain)
+                          .build();
   }
 
   private static void createStringParameter(Construct scope, ApplicationEnvironment appEnv,
