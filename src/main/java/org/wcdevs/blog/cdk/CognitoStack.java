@@ -54,7 +54,7 @@ public final class CognitoStack extends Stack {
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
-  private static final String CONSTRUCT_NAME = "cognito";
+  private static final String CONSTRUCT_NAME = "cognito-stack";
 
   public static final String USER_POOL_CLIENT_SECRET_HOLDER = "userPoolClientSecretValue";
 
@@ -68,12 +68,12 @@ public final class CognitoStack extends Stack {
     var inParams = Objects.requireNonNull(inputParameters);
     var region = Objects.requireNonNull(awsEnvironment.getRegion());
 
-    var name = joinedString(DASH_JOINER, CONSTRUCT_NAME, "stack");
+    var stackName = applicationEnvironment.prefixed(CONSTRUCT_NAME);
     var cognitoPros = StackProps.builder()
-                                .stackName(applicationEnvironment.prefixed(name))
+                                .stackName(stackName)
                                 .env(awsEnvironment)
                                 .build();
-    var cognitoStack = new CognitoStack(scope, id, cognitoPros);
+    var cognitoStack = new CognitoStack(scope, stackName, cognitoPros);
 
     var userPool = userPool(cognitoStack, inParams);
     var userPoolClient = userPoolClient(cognitoStack, userPool, inParams);
@@ -109,6 +109,7 @@ public final class CognitoStack extends Stack {
   private static UserPool userPool(Construct scope, InputParameters inParams) {
     var autoVerifyEmail = AutoVerifiedAttrs.builder()
                                            .email(inParams.isSignInAutoVerifyEmail())
+                                           .phone(inParams.isSignInAutoVerifyPhone())
                                            .build();
     var signInAliases = SignInAliases.builder()
                                      .username(inParams.isSignInAliasUsername())
@@ -314,6 +315,7 @@ public final class CognitoStack extends Stack {
     @lombok.Builder.Default
     private AccountRecovery accountRecovery = AccountRecovery.EMAIL_ONLY;
     private boolean signInAutoVerifyEmail;
+    private boolean signInAutoVerifyPhone;
     @lombok.Builder.Default
     private boolean signInAliasUsername = true;
     @lombok.Builder.Default

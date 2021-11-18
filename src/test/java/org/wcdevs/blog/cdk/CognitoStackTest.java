@@ -121,6 +121,7 @@ class CognitoStackTest {
     assertFalse(input.isSelfSignUpEnabled());
     assertEquals(AccountRecovery.EMAIL_ONLY, input.getAccountRecovery());
     assertFalse(input.isSignInAutoVerifyEmail());
+    assertFalse(input.isSignInAutoVerifyPhone());
     assertTrue(input.isSignInAliasUsername());
     assertTrue(input.isSignInAliasEmail());
     assertFalse(input.isSignInAliasPhone());
