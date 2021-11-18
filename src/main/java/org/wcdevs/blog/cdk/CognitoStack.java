@@ -49,6 +49,7 @@ import static software.amazon.awscdk.customresources.AwsCustomResourcePolicy.ANY
 public final class CognitoStack extends Stack {
   private static final String PARAM_USER_POOL_ID = "userPoolId";
   private static final String PARAM_USER_POOL_CLIENT_ID = "userPoolClientId";
+  private static final String PARAM_USER_POOL_CLIENT_NAME = "userPoolClientName";
   private static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
   private static final String USER_POOL_CLIENT_SECRET = "userPoolClientSecret";
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
@@ -90,6 +91,8 @@ public final class CognitoStack extends Stack {
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_ID, userPool.getUserPoolId());
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_ID,
                           userPoolClient.getUserPoolClientId());
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_NAME,
+                          userPoolClient.getUserPoolClientName());
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_SECRET_ARN,
                           userPoolClientSecret.getSecretArn());
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL, logoutUrl);
@@ -255,6 +258,7 @@ public final class CognitoStack extends Stack {
                                                      ApplicationEnvironment appEnvironment) {
     return new OutputParameters(getParameterUserPoolId(scope, appEnvironment),
                                 getParameterUserPoolClientId(scope, appEnvironment),
+                                getParameterUserPoolClientName(scope, appEnvironment),
                                 getParameterUserPoolClientSecretArn(scope, appEnvironment),
                                 getParameterLogoutUrl(scope, appEnvironment),
                                 getParameterUserPoolProviderUrl(scope, appEnvironment));
@@ -275,6 +279,11 @@ public final class CognitoStack extends Stack {
   public static String getParameterUserPoolClientId(Construct scope,
                                                     ApplicationEnvironment applicationEnvironment) {
     return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID);
+  }
+
+  public static String getParameterUserPoolClientName(Construct scope,
+                                                      ApplicationEnvironment applicationEnvironment) {
+    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_NAME);
   }
 
   public static String getParameterUserPoolClientSecretArn(Construct scope,
@@ -364,6 +373,7 @@ public final class CognitoStack extends Stack {
   public static final class OutputParameters {
     private final String userPoolId;
     private final String userPoolClientId;
+    private final String userPoolClientName;
     private final String userPoolClientSecretArn;
     private final String logoutUrl;
     private final String providerUrl;
