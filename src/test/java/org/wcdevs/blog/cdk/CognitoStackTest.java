@@ -60,6 +60,8 @@ class CognitoStackTest {
 
         var oAuthFlowsBuilderMock = mock(OAuthFlows.Builder.class);
         when(oAuthFlowsBuilderMock.authorizationCodeGrant(any())).thenReturn(oAuthFlowsBuilderMock);
+        when(oAuthFlowsBuilderMock.implicitCodeGrant(any())).thenReturn(oAuthFlowsBuilderMock);
+        when(oAuthFlowsBuilderMock.clientCredentials(any())).thenReturn(oAuthFlowsBuilderMock);
 
         mockedDuration.when(() -> Duration.days(any())).thenReturn(mock(Duration.class));
         mockedOAuthSettings.when(OAuthSettings::builder).thenReturn(oAuthSettingsBuilderMock);
@@ -79,6 +81,9 @@ class CognitoStackTest {
         var inParams = mock(CognitoStack.InputParameters.class);
         when(inParams.getApplicationUrl()).thenReturn(randomString());
         when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
+        when(inParams.isFlowClientCredentialsEnabled()).thenReturn(false);
+        when(inParams.isFlowImplicitCodeGrantEnabled()).thenReturn(false);
+        when(inParams.isFlowAuthorizationCodeGrantEnabled()).thenReturn(true);
 
         var actual = CognitoStack.newInstance(scope, randomString(), awsEnvironment,
                                               applicationEnvironment, inParams);
