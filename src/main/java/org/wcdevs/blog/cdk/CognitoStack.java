@@ -222,7 +222,7 @@ public final class CognitoStack extends Stack {
                                             // to please AWS CDK
                                             // see https://github.com/aws/aws-cdk/issues/5810
                                             .generateStringKey("ignored")
-                                            .passwordLength(1)
+                                            .passwordLength(20)
                                             .build();
     return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET_HOLDER)
                          .secretName(secretName)
