@@ -88,7 +88,8 @@ public final class CognitoStack extends Stack {
 //    var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
 //                                                    userPoolClient.getUserPoolClientId(),
 //                                                    secretName);
-    var clientSecretValue = userPoolClientSecretValue(scope, region, userPool.getUserPoolId(),
+    var clientSecretValue = userPoolClientSecretValue(cognitoStack, region,
+                                                      userPool.getUserPoolId(),
                                                       userPoolClient.getUserPoolClientId());
 
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_ID, userPool.getUserPoolId());
@@ -212,7 +213,7 @@ public final class CognitoStack extends Stack {
                  .collect(toList());
   }
 
-  private static ISecret userPoolClientSecret(Construct scope, String awsRegion, String userPoolId,
+  private static ISecret userPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
                                               String userPoolClientId, String secretName) {
     var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
                                                               userPoolClientId);
@@ -228,7 +229,7 @@ public final class CognitoStack extends Stack {
                          .build();
   }
 
-  private static String userPoolClientSecretValue(Construct scope, String awsRegion,
+  private static String userPoolClientSecretValue(Stack scope, String awsRegion,
                                                   String userPoolId, String userPoolClientId) {
     // The UserPoolClient secret, can't be accessed directly
     // This custom resource will call the AWS API to get the secret,
