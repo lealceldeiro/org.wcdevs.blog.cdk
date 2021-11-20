@@ -107,6 +107,7 @@ class CognitoStackTest {
       assertEquals(expected, actual.getLogoutUrl());
       assertEquals(expected, actual.getProviderUrl());
       assertEquals(expected, actual.getUserPoolClientId());
+      assertEquals(expected, actual.getUserPoolClientName());
       assertEquals(expected, actual.getUserPoolId());
       assertEquals(expected, actual.getUserPoolClientSecretArn());
     }
@@ -121,6 +122,7 @@ class CognitoStackTest {
     assertFalse(input.isSelfSignUpEnabled());
     assertEquals(AccountRecovery.EMAIL_ONLY, input.getAccountRecovery());
     assertFalse(input.isSignInAutoVerifyEmail());
+    assertFalse(input.isSignInAutoVerifyPhone());
     assertTrue(input.isSignInAliasUsername());
     assertTrue(input.isSignInAliasEmail());
     assertFalse(input.isSignInAliasPhone());
