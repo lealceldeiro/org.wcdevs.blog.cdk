@@ -11,14 +11,15 @@ Users of this library, depending also on the AWS CDK itself must use version `1.
 This is a [Maven](https://maven.apache.org/) based project, so you can open it with any Maven
 compatible Java IDE to build and run tests.
 
-To add it as a dependency from Maven Central to your project, add it to your `pom.xml` like this:
+To add it as a dependency from Maven Central to your project, add it to your `pom.xml` as follow,
+by replacing `${cdk-construct-version}` with the displayed version on the top badge.
 
 ```xml
 <dependencies>
   <dependency>
     <groupId>org.wcdevs.blog</groupId>
     <artifactId>cdk</artifactId>
-    <version>1.4.1</version>
+    <version>${cdk-construct-version}</version>
   </dependency>
 </dependencies>
 ```
