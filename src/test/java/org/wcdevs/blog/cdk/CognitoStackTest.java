@@ -141,6 +141,9 @@ class CognitoStackTest {
     assertTrue(input.isUserPoolGenerateSecret());
     assertTrue(input.getUserPoolSuppoertedIdentityProviders().isEmpty());
     assertTrue(input.getUserPoolOauthCallBackUrls().isEmpty());
+    assertFalse(input.isFlowAuthorizationCodeGrantEnabled());
+    assertFalse(input.isFlowImplicitCodeGrantEnabled());
+    assertFalse(input.isFlowClientCredentialsEnabled());
 
     assertEquals(CognitoStack.InputParameters.DEFAULT_COGNITO_LOGOUT_URL_TPL,
                  input.getCognitoLogoutUrlTemplate());

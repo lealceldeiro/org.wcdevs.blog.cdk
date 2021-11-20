@@ -162,10 +162,15 @@ public final class CognitoStack extends Stack {
                                                InputParameters inParams) {
     var callbackUrls = join(inParams.getUserPoolOauthCallBackUrls(), inParams.getAppLoginUrl());
     var logoutUrls = List.of(inParams.getApplicationUrl());
+    var flows = OAuthFlows.builder()
+                          .authorizationCodeGrant(inParams.isFlowAuthorizationCodeGrantEnabled())
+                          .implicitCodeGrant(inParams.isFlowImplicitCodeGrantEnabled())
+                          .clientCredentials(inParams.isFlowClientCredentialsEnabled())
+                          .build();
     var oAuthConf = OAuthSettings.builder()
                                  .callbackUrls(callbackUrls)
                                  .logoutUrls(logoutUrls)
-                                 .flows(OAuthFlows.builder().authorizationCodeGrant(true).build())
+                                 .flows(flows)
                                  .scopes(List.of(OAuthScope.EMAIL, OAuthScope.OPENID,
                                                  OAuthScope.PROFILE))
                                  .build();
@@ -364,6 +369,10 @@ public final class CognitoStack extends Stack {
     private List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
     @lombok.Builder.Default
     private List<String> userPoolOauthCallBackUrls = emptyList();
+
+    private boolean flowAuthorizationCodeGrantEnabled;
+    private boolean flowImplicitCodeGrantEnabled;
+    private boolean flowClientCredentialsEnabled;
 
     String getFullLogoutUrlForRegion(String region) {
       return String.format(getCognitoLogoutUrlTemplate(), getLoginPageDomainPrefix(), region);
