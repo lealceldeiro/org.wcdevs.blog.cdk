@@ -223,6 +223,7 @@ public final class Database extends Construct {
   }
   // endregion
 
+
   // region output parameters
 
   public static ISecret getDataBaseSecret(Construct scope, OutputParameters outParams) {

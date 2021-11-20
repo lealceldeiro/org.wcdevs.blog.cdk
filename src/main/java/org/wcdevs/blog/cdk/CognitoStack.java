@@ -207,8 +207,8 @@ public final class CognitoStack extends Stack {
                  .collect(toList());
   }
 
-  private static Secret userPoolClientSecret(Construct scope, String awsRegion, String userPoolId,
-                                             String userPoolClientId, String secretName) {
+  private static ISecret userPoolClientSecret(Construct scope, String awsRegion, String userPoolId,
+                                              String userPoolClientId, String secretName) {
     var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
                                                               userPoolClientId);
     var secretTemplate = String.format("{\"%s\":\"%s\"}", USER_POOL_CLIENT_SECRET_HOLDER,
