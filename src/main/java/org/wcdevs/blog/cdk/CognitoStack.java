@@ -201,8 +201,7 @@ public final class CognitoStack extends Stack {
   }
 
   private static String createParameterName(ApplicationEnvironment appEnv, String parameterName) {
-    return joinedString(DASH_JOINER, appEnv.getEnvironmentName(), appEnv.getApplicationName(),
-                        CONSTRUCT_NAME, parameterName);
+    return joinedString(DASH_JOINER, appEnv.getEnvironmentName(), CONSTRUCT_NAME, parameterName);
   }
 
   @SafeVarargs
