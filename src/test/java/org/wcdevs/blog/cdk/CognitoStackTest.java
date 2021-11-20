@@ -111,9 +111,6 @@ class CognitoStackTest {
       assertNotNull(actual);
       assertEquals(expected, actual.getLogoutUrl());
       assertEquals(expected, actual.getProviderUrl());
-      assertEquals(expected, actual.getUserPoolClientId());
-      assertEquals(expected, actual.getUserPoolClientName());
-      assertEquals(expected, actual.getUserPoolId());
       assertEquals(expected, actual.getUserPoolClientSecretArn());
     }
   }

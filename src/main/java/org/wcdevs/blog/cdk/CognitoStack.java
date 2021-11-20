@@ -47,17 +47,16 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 import static software.amazon.awscdk.customresources.AwsCustomResourcePolicy.ANY_RESOURCE;
 
 public final class CognitoStack extends Stack {
-  private static final String PARAM_USER_POOL_ID = "userPoolId";
-  private static final String PARAM_USER_POOL_CLIENT_ID = "userPoolClientId";
-  private static final String PARAM_USER_POOL_CLIENT_NAME = "userPoolClientName";
   private static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
-  private static final String USER_POOL_CLIENT_SECRET = "userPoolClientSecret";
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
   private static final String CONSTRUCT_NAME = "cognito-stack";
 
-  public static final String USER_POOL_CLIENT_SECRET_HOLDER = "userPoolClientSecretValue";
+  public static final String USER_POOL_CLIENT_SECRET_HOLDER = "userPoolClientSecret";
+  public static final String USER_POOL_ID_HOLDER = "userPoolId";
+  public static final String USER_POOL_CLIENT_ID_HOLDER = "userPoolClientId";
+  public static final String USER_POOL_CLIENT_NAME_HOLDER = "userPoolClientName";
 
   private CognitoStack(Construct scope, String id, StackProps props) {
     super(scope, id, props);
@@ -83,22 +82,14 @@ public final class CognitoStack extends Stack {
 
     createUserPoolDomain(cognitoStack, userPool, inParams);
 
-    var secretName = appEnv.prefixed(USER_POOL_CLIENT_SECRET);
-    // FIXME: do not store actual secret value
-//    var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
-//                                                    userPoolClient.getUserPoolClientId(),
-//                                                    secretName);
-    var clientSecretValue = userPoolClientSecretValue(cognitoStack, region,
-                                                      userPool.getUserPoolId(),
-                                                      userPoolClient.getUserPoolClientId());
+    var secretName = appEnv.prefixed(USER_POOL_CLIENT_SECRET_HOLDER);
+    var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
+                                                    userPoolClient.getUserPoolClientId(),
+                                                    userPoolClient.getUserPoolClientName(),
+                                                    secretName);
 
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_ID, userPool.getUserPoolId());
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_ID,
-                          userPoolClient.getUserPoolClientId());
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_NAME,
-                          userPoolClient.getUserPoolClientName());
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_SECRET_ARN,
-                          clientSecretValue);
+                          userPoolClientSecret.getSecretArn());
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL, logoutUrl);
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_PROVIDER_URL,
                           userPool.getUserPoolProviderUrl());
@@ -106,10 +97,9 @@ public final class CognitoStack extends Stack {
     return cognitoStack;
   }
 
-  // FIXME: make method available again when security fix is done
-  static ISecret getUserPoolClientSecret(Construct scope, OutputParameters outParams) {
+  public static ISecret getUserPoolClientSecret(Construct scope, OutputParameters outParams) {
     var arn = Objects.requireNonNull(outParams.getUserPoolClientSecretArn());
-    return Secret.fromSecretCompleteArn(scope, USER_POOL_CLIENT_SECRET, arn);
+    return Secret.fromSecretCompleteArn(scope, PARAM_USER_POOL_CLIENT_SECRET_ARN, arn);
   }
 
   // region helpers
@@ -218,17 +208,25 @@ public final class CognitoStack extends Stack {
   }
 
   private static ISecret userPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
-                                              String userPoolClientId, String secretName) {
+                                              String userPoolClientId, String userPoolClientName,
+                                              String secretName) {
     var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
                                                               userPoolClientId);
-    var secretTemplate = String.format("{\"%s\":\"%s\"}", USER_POOL_CLIENT_SECRET_HOLDER,
-                                       userPoolClientSecretValue);
+    var secretTpl = String.format("{\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\"}",
+                                  USER_POOL_ID_HOLDER, userPoolId,
+                                  USER_POOL_CLIENT_ID_HOLDER, userPoolClientId,
+                                  USER_POOL_CLIENT_NAME_HOLDER, userPoolClientName,
+                                  USER_POOL_CLIENT_SECRET_HOLDER, userPoolClientSecretValue);
     var secretString = SecretStringGenerator.builder()
-                                            .secretStringTemplate(secretTemplate)
+                                            .secretStringTemplate(secretTpl)
+                                            // to please AWS CDK
+                                            // see https://github.com/aws/aws-cdk/issues/5810
+                                            .generateStringKey("ignored")
+                                            .passwordLength(1)
                                             .build();
-    return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET)
+    return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET_HOLDER)
                          .secretName(secretName)
-                         .description("User pool client secret")
+                         .description("Secret holding the user pool client secret values")
                          .generateSecretString(secretString)
                          .build();
   }
@@ -266,10 +264,7 @@ public final class CognitoStack extends Stack {
   // region get output params
   public static OutputParameters getOutputParameters(Construct scope,
                                                      ApplicationEnvironment appEnvironment) {
-    return new OutputParameters(getParameterUserPoolId(scope, appEnvironment),
-                                getParameterUserPoolClientId(scope, appEnvironment),
-                                getParameterUserPoolClientName(scope, appEnvironment),
-                                getParameterUserPoolClientSecretArn(scope, appEnvironment),
+    return new OutputParameters(getParameterUserPoolClientSecretArn(scope, appEnvironment),
                                 getParameterLogoutUrl(scope, appEnvironment),
                                 getParameterUserPoolProviderUrl(scope, appEnvironment));
   }
@@ -279,21 +274,6 @@ public final class CognitoStack extends Stack {
     return StringParameter.fromStringParameterName(scope, id,
                                                    createParameterName(applicationEnvironment, id))
                           .getStringValue();
-  }
-
-  public static String getParameterUserPoolId(Construct scope,
-                                              ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_ID);
-  }
-
-  public static String getParameterUserPoolClientId(Construct scope,
-                                                    ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_ID);
-  }
-
-  public static String getParameterUserPoolClientName(Construct scope,
-                                                      ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_CLIENT_NAME);
   }
 
   public static String getParameterUserPoolClientSecretArn(Construct scope,
@@ -386,9 +366,6 @@ public final class CognitoStack extends Stack {
   @Getter
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   public static final class OutputParameters {
-    private final String userPoolId;
-    private final String userPoolClientId;
-    private final String userPoolClientName;
     private final String userPoolClientSecretArn;
     private final String logoutUrl;
     private final String providerUrl;
