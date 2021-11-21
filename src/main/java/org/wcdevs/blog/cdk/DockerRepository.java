@@ -1,9 +1,7 @@
 package org.wcdevs.blog.cdk;
 
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.RemovalPolicy;
@@ -84,42 +82,20 @@ public final class DockerRepository extends Construct {
   /**
    * Creates a new {@link InputParameters} from a given repository name and an account id.
    *
-   * @param repositoryName Repository name.
-   * @param accountId      Account id.
+   * @param repoName  Repository name.
+   * @param accountId Account id.
    *
    * @return The newly created {@link InputParameters}.
    */
-  public static InputParameters newInputParameters(String repositoryName, String accountId) {
-    return new InputParameters(repositoryName, accountId);
-  }
-
-  /**
-   * Creates a new {@link InputParameters} from a given arguments.
-   *
-   * @param repositoryName         Repository name.
-   * @param accountId              Account id.
-   * @param maxImageCount          Max number of images to keep in the repository.
-   * @param retainRegistryOnDelete Whether to retain the registry on repository delete or not.
-   *                               {@code true}: keep, {@code false}: delete.
-   * @param inmutableTags          Whether image tags should be inmutable or not.
-   *                               {@code true}: inmutable, {@code false}: mutable.
-   *
-   * @return The newly created {@link InputParameters}.
-   */
-  public static InputParameters newInputParameters(String repositoryName, String accountId,
-                                                   int maxImageCount,
-                                                   boolean retainRegistryOnDelete,
-                                                   boolean inmutableTags) {
-    return new InputParameters(repositoryName, accountId, maxImageCount, retainRegistryOnDelete,
-                               inmutableTags);
+  public static InputParameters newInputParameters(String repoName, String accountId) {
+    return InputParameters.builder().repositoryName(repoName).accountId(accountId).build();
   }
 
   /**
    * Holds the input parameters to build a new {@link DockerRepository}.
    */
   @Getter(AccessLevel.PACKAGE)
-  @AllArgsConstructor(access = AccessLevel.PACKAGE)
-  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+  @lombok.Builder
   public static final class InputParameters {
     static final int DEFAULT_MAX_IMAGE_COUNT = 10;
     static final boolean DEFAULT_RETAIN_POLICY = true;
@@ -128,22 +104,25 @@ public final class DockerRepository extends Construct {
     /**
      * Name of the docker repository to be created.
      */
-    private final String repositoryName;
+    private String repositoryName;
     /**
      * AWS account id with push/pull permission over the Docker repository.
      */
-    private final String accountId;
+    private String accountId;
     /**
      * Max number of images to keep in the repo.
      */
+    @lombok.Builder.Default
     private int maxImageCount = DEFAULT_MAX_IMAGE_COUNT;
     /**
      * Whether the container registry should be destroyed or retained on deletion.
      */
+    @lombok.Builder.Default
     private boolean retainRegistryOnDelete = DEFAULT_RETAIN_POLICY;
     /**
      * Whether tags shall be mutable or not.
      */
+    @lombok.Builder.Default
     private boolean inmutableTags = DEFAULT_INMUTABLE_TAGS;
 
     RemovalPolicy removalPolicy() {
