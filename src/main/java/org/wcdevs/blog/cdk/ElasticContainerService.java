@@ -3,7 +3,6 @@ package org.wcdevs.blog.cdk;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import software.amazon.awscdk.core.CfnCondition;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Environment;
@@ -65,8 +64,6 @@ import static java.util.Collections.emptyMap;
  * </ul>
  *
  * @see ElasticContainerService#newInstance(Construct, String, Environment, ApplicationEnvironment, InputParameters, Network.OutputParameters)
- * @see ElasticContainerService#newDockerImage(String, String, String)
- * @see ElasticContainerService#newInputParameters(DockerImage, Map, List)
  * @see Network#outputParametersFrom(Construct, ApplicationEnvironment)
  */
 public final class ElasticContainerService extends Construct {
@@ -439,77 +436,78 @@ public final class ElasticContainerService extends Construct {
 
   // region inner classes
   public static InputParameters newInputParameters(DockerImage dockerImage) {
-    return newInputParameters(dockerImage, emptyMap(), emptyList());
+    return InputParameters.builder().dockerImage(dockerImage).build();
   }
 
-  public static InputParameters newInputParameters(DockerImage dockerImage,
-                                                   Map<String, String> environmentVariables) {
-    return newInputParameters(dockerImage, environmentVariables, emptyList());
-  }
-
-  public static InputParameters newInputParameters(DockerImage dockerImage,
-                                                   Map<String, String> environmentVariables,
-                                                   List<String> secGroupIdsToGrantIngressFromEcs) {
-    return new InputParameters(Objects.requireNonNull(dockerImage),
-                               Objects.requireNonNull(environmentVariables),
-                               Objects.requireNonNull(secGroupIdsToGrantIngressFromEcs));
-  }
-
-  public static DockerImage newDockerImage(String dockerRepositoryName, String dockerImageTag,
-                                           String dockerImageUrl) {
-    if ((dockerRepositoryName != null && dockerImageTag != null) || dockerImageUrl != null) {
-      return new DockerImage(dockerRepositoryName, dockerImageTag, dockerImageUrl);
-    }
-    throw new IllegalArgumentException("You need to either specify the docker repository name"
-                                       + " and docker image tag or you need to specify the docker"
-                                       + " image url");
-  }
 
   @Getter(AccessLevel.PACKAGE)
-  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-  @Setter
+  @lombok.Builder
   public static final class InputParameters {
-    private final DockerImage dockerImage;
-    private final Map<String, String> environmentVariables;
-    private final List<String> securityGroupIdsToGrantIngressFromEcs;
+    private static final String DEFAULT_PROTOCOL = "HTTP";
+    private static final int DEFAULT_PORT = 8080;
+    private static final String DEFAULT_PATH = "/";
 
+    private DockerImage dockerImage;
+
+    @lombok.Builder.Default
+    private Map<String, String> environmentVariables = emptyMap();
+    @lombok.Builder.Default
+    private List<String> securityGroupIdsToGrantIngressFromEcs = emptyList();
+    @lombok.Builder.Default
     private List<PolicyStatement> taskRolePolicyStatements = emptyList();
-    private String applicationProtocol = "HTTP";
-    private int applicationPort = 8080;
-    private String healthCheckProtocol = "HTTP";
-    private int healthCheckPort = 8080;
-    private String healthCheckPath = "/";
+    @lombok.Builder.Default
+    private String applicationProtocol = DEFAULT_PROTOCOL;
+    @lombok.Builder.Default
+    private int applicationPort = DEFAULT_PORT;
+    @lombok.Builder.Default
+    private String healthCheckProtocol = DEFAULT_PROTOCOL;
+    @lombok.Builder.Default
+    private int healthCheckPort = DEFAULT_PORT;
+    @lombok.Builder.Default
+    private String healthCheckPath = DEFAULT_PATH;
+    @lombok.Builder.Default
     private int healthCheckIntervalSeconds = 15;
+    @lombok.Builder.Default
     private int healthCheckTimeoutSeconds = 5;
+    @lombok.Builder.Default
     private int healthyThresholdCount = 2;
+    @lombok.Builder.Default
     private int unhealthyThresholdCount = 8;
+    @lombok.Builder.Default
     private RetentionDays logRetention = RetentionDays.ONE_WEEK;
+    @lombok.Builder.Default
     private int cpu = 256;
+    @lombok.Builder.Default
     private int memory = 512;
+    @lombok.Builder.Default
     private int desiredInstancesCount = 2;
+    @lombok.Builder.Default
     private int maximumInstancesPercent = 200;
+    @lombok.Builder.Default
     private int minimumHealthyInstancesPercent = 50;
     private boolean stickySessionsEnabled;
+    @lombok.Builder.Default
     private int stickySessionsCookieDuration = 3600;
+    @lombok.Builder.Default
     private String awsLogsDateTimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z";
 
     String getHealthCheckPortString() {
-      return String.valueOf(healthCheckPort);
+      return Objects.nonNull(healthCheckPort) ? String.valueOf(healthCheckPort) : "";
     }
   }
 
-  @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+  @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static final class DockerImage {
     /**
      * Name of an ECR repository.
      */
-    private final String dockerRepositoryName;
-    private final String dockerImageTag;
-    private final String dockerImageUrl;
+    private String dockerRepositoryName;
+    private String dockerImageTag;
+    private String dockerImageUrl;
 
     boolean isEcrSource() {
-      return this.dockerRepositoryName != null;
+      return Objects.nonNull(dockerRepositoryName);
     }
   }
 
