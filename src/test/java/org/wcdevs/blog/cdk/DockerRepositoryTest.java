@@ -1,6 +1,5 @@
 package org.wcdevs.blog.cdk;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,6 +17,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -63,23 +63,51 @@ class DockerRepositoryTest {
         when(inParams.tagMutability()).thenReturn(tagMutable);
         when(inParams.isInmutableTags()).thenReturn(tagMutable == TagMutability.IMMUTABLE);
         var actual = DockerRepository.newInstance(mock(Construct.class), randomString(), inParams);
-        Assertions.assertNotNull(actual);
+        assertNotNull(actual);
       }
     });
   }
 
   @Test
   void newInputParameters() {
-    Assertions.assertNotNull(DockerRepository.newInputParameters(randomString(), randomString()));
+    var repositoryName = randomString();
+    var accountId = randomString();
+    var actual = DockerRepository.newInputParameters(repositoryName, accountId);
+    assertNotNull(actual);
+    assertEquals(repositoryName, actual.getRepositoryName());
+    assertEquals(accountId, actual.getAccountId());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_MAX_IMAGE_COUNT,
+                 actual.getMaxImageCount());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_RETAIN_POLICY,
+                 actual.isRetainRegistryOnDelete());
+    assertEquals(DockerRepository.InputParameters.DEFAULT_INMUTABLE_TAGS,
+                 actual.isInmutableTags());
+    assertEquals(TagMutability.IMMUTABLE, actual.tagMutability());
+    assertEquals(RemovalPolicy.RETAIN, actual.removalPolicy());
   }
 
   @Test
-  void newInputParametersOverload() {
+  void newInputParametersFromBuilder() {
     var random = new SecureRandom();
-    Assertions.assertNotNull(DockerRepository.newInputParameters(randomString(), randomString(),
-                                                                 random.nextInt(),
-                                                                 random.nextBoolean(),
-                                                                 random.nextBoolean()));
+    var repoName = randomString();
+    var accountId = randomString();
+    var maxImageCount = random.nextInt();
+    var inmutableTags = random.nextBoolean();
+    var retainRegistryOnDelete = random.nextBoolean();
+
+    var actual = DockerRepository.InputParameters.builder()
+                                                 .repositoryName(repoName)
+                                                 .accountId(accountId)
+                                                 .maxImageCount(maxImageCount)
+                                                 .inmutableTags(inmutableTags)
+                                                 .retainRegistryOnDelete(retainRegistryOnDelete)
+                                                 .build();
+    assertNotNull(actual);
+    assertEquals(repoName, actual.getRepositoryName());
+    assertEquals(accountId, actual.getAccountId());
+    assertEquals(maxImageCount, actual.getMaxImageCount());
+    assertEquals(inmutableTags, actual.isInmutableTags());
+    assertEquals(retainRegistryOnDelete, actual.isRetainRegistryOnDelete());
   }
 
   private String randomString() {
@@ -98,24 +126,6 @@ class DockerRepositoryTest {
         assertEquals(repositoryMock, actual.getEcRepository());
       }
     });
-  }
-
-  @Test
-  void requiredConstructor() {
-    var repositoryName = randomString();
-    var accountId = randomString();
-    var actual = new DockerRepository.InputParameters(repositoryName, accountId);
-    Assertions.assertNotNull(actual);
-    assertEquals(repositoryName, actual.getRepositoryName());
-    assertEquals(accountId, actual.getAccountId());
-    assertEquals(DockerRepository.InputParameters.DEFAULT_MAX_IMAGE_COUNT,
-                 actual.getMaxImageCount());
-    assertEquals(DockerRepository.InputParameters.DEFAULT_RETAIN_POLICY,
-                 actual.isRetainRegistryOnDelete());
-    assertEquals(DockerRepository.InputParameters.DEFAULT_INMUTABLE_TAGS,
-                 actual.isInmutableTags());
-    assertEquals(TagMutability.IMMUTABLE, actual.tagMutability());
-    assertEquals(RemovalPolicy.RETAIN, actual.removalPolicy());
   }
 
   @Test
@@ -141,7 +151,7 @@ class DockerRepositoryTest {
     var actual = new DockerRepository.InputParameters(repoName, accountId, expectedMaxImageCount,
                                                       expectedRetainRegistry,
                                                       expectedInmutableTags);
-    Assertions.assertNotNull(actual);
+    assertNotNull(actual);
     assertEquals(repoName, actual.getRepositoryName());
     assertEquals(accountId, actual.getAccountId());
     assertEquals(expectedMaxImageCount, actual.getMaxImageCount());
