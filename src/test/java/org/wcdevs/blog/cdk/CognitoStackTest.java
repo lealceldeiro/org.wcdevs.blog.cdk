@@ -176,10 +176,6 @@ class CognitoStackTest {
     var envName = randomString();
     var appName = randomString();
     var secretMock = mock(ISecret.class);
-
-    var clientName = Util.joinedString(Util.DASH_JOINER, appName, "up", "client");
-    var arnParamHolder = CognitoStack.PARAM_USER_POOL_CLIENT_SECRET_ARN
-                         + clientName;
     var arn = randomString();
 
     try (
@@ -190,7 +186,7 @@ class CognitoStackTest {
       when(stringParam.getStringValue()).thenReturn(arn);
       mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
                            .thenReturn(stringParam);
-      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), eq(arnParamHolder), eq(arn)))
+      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), any()))
                   .thenReturn(secretMock);
       var appEnv = mock(ApplicationEnvironment.class);
       when(appEnv.getEnvironmentName()).thenReturn(envName);
