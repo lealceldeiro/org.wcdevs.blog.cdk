@@ -69,20 +69,19 @@ public final class CognitoStack extends Stack {
   }
 
   public static CognitoStack newInstance(Construct scope, Environment awsEnvironment,
-                                         ApplicationEnvironment applicationEnvironment,
-                                         InputParameters inputParameters) {
+                                         String environmentName, InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
-    var appEnv = Objects.requireNonNull(applicationEnvironment);
     var region = Objects.requireNonNull(awsEnvironment.getRegion());
 
-    var stackName = appEnv.prefixed(CONSTRUCT_NAME);
+    var envName = Objects.requireNonNull(environmentName);
+    var stackName = joinedString(DASH_JOINER, envName, CONSTRUCT_NAME);
     var cognitoProps = StackProps.builder().stackName(stackName).env(awsEnvironment).build();
     var cognitoStack = new CognitoStack(scope, stackName, cognitoProps);
 
-    var userPool = userPool(cognitoStack, inParams, appEnv);
+    var userPool = userPool(cognitoStack, inParams, envName);
     createUserPoolDomain(cognitoStack, userPool, inParams);
 
-    var clientsSecretBaseName = appEnv.prefixed(USER_POOL_CLIENT_SECRET_HOLDER);
+    var clientsSecretBaseName = joinedString(DASH_JOINER, envName, USER_POOL_CLIENT_SECRET_HOLDER);
     createUserPoolClients(cognitoStack, userPool, inParams.getUserPoolClientConfigurations())
         // and
         .forEach(client -> {
@@ -92,12 +91,12 @@ public final class CognitoStack extends Stack {
                                                      client.getUserPoolClientName(),
                                                      clientsSecretBaseName);
           var arnParamHolder = clientSecretArnParamHolder(client.getUserPoolClientName());
-          createStringParameter(cognitoStack, appEnv, arnParamHolder, secretArn);
+          createStringParameter(cognitoStack, envName, arnParamHolder, secretArn);
         });
 
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL,
+    createStringParameter(cognitoStack, envName, PARAM_USER_POOL_LOGOUT_URL,
                           inParams.getFullLogoutUrlForRegion(region));
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_PROVIDER_URL,
+    createStringParameter(cognitoStack, envName, PARAM_USER_POOL_PROVIDER_URL,
                           userPool.getUserPoolProviderUrl());
 
     return cognitoStack;
@@ -124,8 +123,7 @@ public final class CognitoStack extends Stack {
   }
 
   // region helpers
-  private static UserPool userPool(Stack scope, InputParameters inParams,
-                                   ApplicationEnvironment appEnv) {
+  private static UserPool userPool(Stack scope, InputParameters inParams, String environment) {
     var autoVerifyEmail = AutoVerifiedAttrs.builder()
                                            .email(inParams.isSignInAutoVerifyEmail())
                                            .phone(inParams.isSignInAutoVerifyPhone())
@@ -157,7 +155,7 @@ public final class CognitoStack extends Stack {
                                        .tempPasswordValidity(tempPasswordValidityDays)
                                        .build();
     return UserPool.Builder.create(scope, "userPool")
-                           .userPoolName(appEnv.prefixed("user-pool"))
+                           .userPoolName(joinedString(DASH_JOINER, environment, "user-pool"))
                            .selfSignUpEnabled(inParams.isSelfSignUpEnabled())
                            .accountRecovery(inParams.getAccountRecovery())
                            .autoVerify(autoVerifyEmail)
@@ -209,16 +207,15 @@ public final class CognitoStack extends Stack {
                           .build();
   }
 
-  private static void createStringParameter(Stack scope, ApplicationEnvironment appEnv, String id,
-                                            String value) {
+  private static void createStringParameter(Stack scope, String envName, String id, String value) {
     StringParameter.Builder.create(scope, id)
-                           .parameterName(createParameterName(appEnv, id))
+                           .parameterName(createParameterName(envName, id))
                            .stringValue(value)
                            .build();
   }
 
-  private static String createParameterName(ApplicationEnvironment appEnv, String parameterName) {
-    return joinedString(DASH_JOINER, appEnv.getEnvironmentName(), CONSTRUCT_NAME, parameterName);
+  private static String createParameterName(String envName, String parameterName) {
+    return joinedString(DASH_JOINER, envName, CONSTRUCT_NAME, parameterName);
   }
 
   @SafeVarargs
@@ -295,18 +292,18 @@ public final class CognitoStack extends Stack {
    * configured.
    *
    * @param scope  Scope to retrieve the parameters from.
-   * @param appEnv {@link ApplicationEnvironment} associated to these parameters.
+   * @param appEnv Environment name associated to these parameters.
    *
    * @return An {@link OutputParameters} instance with the values.
    *
    * @see CognitoStack#getParameterUserPoolClientSecretArn(Stack, ApplicationEnvironment)
    */
-  public static OutputParameters getOutputParameters(Stack scope, ApplicationEnvironment appEnv) {
+  public static OutputParameters getOutputParameters(Stack scope, String appEnv) {
     return new OutputParameters(getParameterLogoutUrl(scope, appEnv),
                                 getParameterUserPoolProviderUrl(scope, appEnv));
   }
 
-  public static String getParameter(Stack scope, ApplicationEnvironment appEnv, String id) {
+  public static String getParameter(Stack scope, String appEnv, String id) {
     return StringParameter.fromStringParameterName(scope, id, createParameterName(appEnv, id))
                           .getStringValue();
   }
@@ -314,14 +311,14 @@ public final class CognitoStack extends Stack {
   public static String getParameterUserPoolClientSecretArn(Stack scope,
                                                            ApplicationEnvironment appEnv) {
     var clientName = clientName(appEnv.getApplicationName());
-    return getParameter(scope, appEnv, clientSecretArnParamHolder(clientName));
+    return getParameter(scope, appEnv.getEnvironmentName(), clientSecretArnParamHolder(clientName));
   }
 
-  public static String getParameterLogoutUrl(Stack scope, ApplicationEnvironment appEnv) {
+  public static String getParameterLogoutUrl(Stack scope, String appEnv) {
     return getParameter(scope, appEnv, PARAM_USER_POOL_LOGOUT_URL);
   }
 
-  public static String getParameterUserPoolProviderUrl(Stack scope, ApplicationEnvironment appEnv) {
+  public static String getParameterUserPoolProviderUrl(Stack scope, String appEnv) {
     return getParameter(scope, appEnv, PARAM_USER_POOL_PROVIDER_URL);
   }
   // endregion
