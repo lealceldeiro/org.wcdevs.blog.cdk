@@ -75,7 +75,6 @@ class CognitoStackTest {
             .thenReturn(stringParameterBuilderMock);
 
         var scope = mock(Construct.class);
-        var applicationEnvironment = mock(ApplicationEnvironment.class);
 
         var awsEnvironment = mock(Environment.class);
         when(awsEnvironment.getRegion()).thenReturn(randomString());
@@ -90,8 +89,7 @@ class CognitoStackTest {
         when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
         when(inParams.getUserPoolClientConfigurations()).thenReturn(List.of(clientParams));
 
-        var actual = CognitoStack.newInstance(scope, awsEnvironment, applicationEnvironment,
-                                              inParams);
+        var actual = CognitoStack.newInstance(scope, awsEnvironment, randomString(), inParams);
         assertNotNull(actual);
       }
     });
@@ -111,8 +109,7 @@ class CognitoStackTest {
       mockedStringParameter
           .when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
           .thenReturn(stringParamMock);
-      var actual = CognitoStack.getOutputParameters(mock(Stack.class),
-                                                    mock(ApplicationEnvironment.class));
+      var actual = CognitoStack.getOutputParameters(mock(Stack.class), randomString());
       assertNotNull(actual);
       assertEquals(expected, actual.getLogoutUrl());
       assertEquals(expected, actual.getProviderUrl());
