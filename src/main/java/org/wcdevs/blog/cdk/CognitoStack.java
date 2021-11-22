@@ -229,7 +229,7 @@ public final class CognitoStack extends Stack {
                                                    String userPoolClientId, String clientName,
                                                    String secretName) {
     var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
-                                                              userPoolClientId);
+                                                              userPoolClientId, clientName);
     var secretTpl = String.format("{\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\"}",
                                   USER_POOL_ID_HOLDER, userPoolId,
                                   USER_POOL_CLIENT_ID_HOLDER, userPoolClientId,
@@ -252,7 +252,7 @@ public final class CognitoStack extends Stack {
   }
 
   private static String userPoolClientSecretValue(Stack scope, String awsRegion, String userPoolId,
-                                                  String userPoolClientId) {
+                                                  String userPoolClientId, String clientName) {
     // The UserPoolClient secret, can't be accessed directly
     // This custom resource will call the AWS API to get the secret,
     // See: https://github.com/aws/aws-cdk/issues/7225
@@ -270,8 +270,7 @@ public final class CognitoStack extends Stack {
     var policy = AwsCustomResourcePolicy.fromSdkCalls(SdkCallsPolicyOptions.builder()
                                                                            .resources(ANY_RESOURCE)
                                                                            .build());
-    var id = "describeUserPool" + userPoolClientId;
-    var userPoolResource = AwsCustomResource.Builder.create(scope, id)
+    var userPoolResource = AwsCustomResource.Builder.create(scope, "describeUserPool" + clientName)
                                                     .resourceType(resourceType)
                                                     .installLatestAwsSdk(false)
                                                     .onUpdate(userPoolClientMetadata)
