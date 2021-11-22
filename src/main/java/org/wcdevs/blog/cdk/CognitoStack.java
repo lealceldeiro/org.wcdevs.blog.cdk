@@ -107,13 +107,6 @@ public final class CognitoStack extends Stack {
     return clientParams.stream().map(clientParam -> userPoolClient(scope, userPool, clientParam));
   }
 
-  public static ISecret getUserPoolClientSecret(Stack scope, ApplicationEnvironment appEnv) {
-    var clientName = clientName(appEnv.getApplicationName());
-    var arnParamHolder = clientSecretArnParamHolder(clientName);
-    var arn = getParameterUserPoolClientSecretArn(scope, appEnv);
-    return Secret.fromSecretCompleteArn(scope, arnParamHolder, arn);
-  }
-
   private static String clientSecretArnParamHolder(String userPoolClientName) {
     return PARAM_USER_POOL_CLIENT_SECRET_ARN + userPoolClientName;
   }
@@ -208,10 +201,14 @@ public final class CognitoStack extends Stack {
   }
 
   private static void createStringParameter(Stack scope, String envName, String id, String value) {
-    StringParameter.Builder.create(scope, id)
+    StringParameter.Builder.create(scope, parameterId(id))
                            .parameterName(createParameterName(envName, id))
                            .stringValue(value)
                            .build();
+  }
+
+  private static String parameterId(String id) {
+    return joinedString(DASH_JOINER, CONSTRUCT_NAME, "param", id);
   }
 
   private static String createParameterName(String envName, String parameterName) {
@@ -282,6 +279,12 @@ public final class CognitoStack extends Stack {
   // endregion
 
   // region get output params
+  public static ISecret getUserPoolClientSecret(Stack scope, ApplicationEnvironment appEnv) {
+    var clientName = clientName(appEnv.getApplicationName());
+    var secConstructId = joinedString(DASH_JOINER, clientSecretArnParamHolder(clientName), "sec");
+    var arn = getParameterUserPoolClientSecretArn(scope, appEnv);
+    return Secret.fromSecretCompleteArn(scope, secConstructId, arn);
+  }
 
   /**
    * Returns the output parameters from this stack creation except the user pool clients secret
@@ -303,7 +306,8 @@ public final class CognitoStack extends Stack {
   }
 
   public static String getParameter(Stack scope, String appEnv, String id) {
-    return StringParameter.fromStringParameterName(scope, id, createParameterName(appEnv, id))
+    return StringParameter.fromStringParameterName(scope, parameterId(id),
+                                                   createParameterName(appEnv, id))
                           .getStringValue();
   }
 
