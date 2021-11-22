@@ -47,7 +47,13 @@ import static org.wcdevs.blog.cdk.Util.joinedString;
 import static software.amazon.awscdk.customresources.AwsCustomResourcePolicy.ANY_RESOURCE;
 
 public final class CognitoStack extends Stack {
-  private static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
+  // https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-integration.html
+  static final String DEFAULT_COGNITO_LOGOUT_URL_TPL
+      = "https://%s.auth.%s.amazoncognito.com/logout";
+  static final String DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE
+      = "%s/login/oauth2/code/cognito";
+
+  static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
@@ -62,49 +68,64 @@ public final class CognitoStack extends Stack {
     super(scope, id, props);
   }
 
-  public static CognitoStack newInstance(Construct scope, String id, Environment awsEnvironment,
+  public static CognitoStack newInstance(Construct scope, Environment awsEnvironment,
                                          ApplicationEnvironment applicationEnvironment,
                                          InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
     var appEnv = Objects.requireNonNull(applicationEnvironment);
     var region = Objects.requireNonNull(awsEnvironment.getRegion());
 
-    var stackName = appEnv.prefixed(joinedString(DASH_JOINER, id, CONSTRUCT_NAME));
-    var cognitoPros = StackProps.builder()
-                                .stackName(stackName)
-                                .env(awsEnvironment)
-                                .build();
-    var cognitoStack = new CognitoStack(scope, stackName, cognitoPros);
+    var stackName = appEnv.prefixed(CONSTRUCT_NAME);
+    var cognitoProps = StackProps.builder().stackName(stackName).env(awsEnvironment).build();
+    var cognitoStack = new CognitoStack(scope, stackName, cognitoProps);
 
     var userPool = userPool(cognitoStack, inParams, appEnv);
-    var userPoolClient = userPoolClient(cognitoStack, userPool, inParams);
-    var logoutUrl = inParams.getFullLogoutUrlForRegion(region);
-
     createUserPoolDomain(cognitoStack, userPool, inParams);
 
-    var secretName = appEnv.prefixed(USER_POOL_CLIENT_SECRET_HOLDER);
-    var userPoolClientSecret = userPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
-                                                    userPoolClient.getUserPoolClientId(),
-                                                    userPoolClient.getUserPoolClientName(),
-                                                    secretName);
+    var clientsSecretBaseName = appEnv.prefixed(USER_POOL_CLIENT_SECRET_HOLDER);
+    createUserPoolClients(cognitoStack, userPool, inParams.getUserPoolClientConfigurations())
+        // and
+        .forEach(client -> {
+          var secretArn = createUserPoolClientSecret(cognitoStack, region,
+                                                     userPool.getUserPoolId(),
+                                                     client.getUserPoolClientId(),
+                                                     client.getUserPoolClientName(),
+                                                     clientsSecretBaseName);
+          var arnParamHolder = clientSecretArnParamHolder(client.getUserPoolClientName());
+          createStringParameter(cognitoStack, appEnv, arnParamHolder, secretArn);
+        });
 
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_CLIENT_SECRET_ARN,
-                          userPoolClientSecret.getSecretArn());
-    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL, logoutUrl);
+    createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_LOGOUT_URL,
+                          inParams.getFullLogoutUrlForRegion(region));
     createStringParameter(cognitoStack, appEnv, PARAM_USER_POOL_PROVIDER_URL,
                           userPool.getUserPoolProviderUrl());
 
     return cognitoStack;
   }
 
-  public static ISecret getUserPoolClientSecret(Construct scope, OutputParameters outParams) {
-    var arn = Objects.requireNonNull(outParams.getUserPoolClientSecretArn());
-    return Secret.fromSecretCompleteArn(scope, PARAM_USER_POOL_CLIENT_SECRET_ARN, arn);
+  private static Stream<UserPoolClient> createUserPoolClients(Stack scope, IUserPool userPool,
+                                                              Collection<UserPoolClientParameter> clientParams) {
+    return clientParams.stream().map(clientParam -> userPoolClient(scope, userPool, clientParam));
+  }
+
+  public static ISecret getUserPoolClientSecret(Stack scope, ApplicationEnvironment appEnv) {
+    var clientName = clientName(appEnv.getApplicationName());
+    var arnParamHolder = clientSecretArnParamHolder(clientName);
+    var arn = getParameterUserPoolClientSecretArn(scope, appEnv);
+    return Secret.fromSecretCompleteArn(scope, arnParamHolder, arn);
+  }
+
+  private static String clientSecretArnParamHolder(String userPoolClientName) {
+    return PARAM_USER_POOL_CLIENT_SECRET_ARN + userPoolClientName;
+  }
+
+  private static String clientName(String applicationName) {
+    return joinedString(DASH_JOINER, applicationName, "up", "client");
   }
 
   // region helpers
-  private static UserPool userPool(Construct scope, InputParameters inParams,
-                                   ApplicationEnvironment applicationEnvironment) {
+  private static UserPool userPool(Stack scope, InputParameters inParams,
+                                   ApplicationEnvironment appEnv) {
     var autoVerifyEmail = AutoVerifiedAttrs.builder()
                                            .email(inParams.isSignInAutoVerifyEmail())
                                            .phone(inParams.isSignInAutoVerifyPhone())
@@ -136,7 +157,7 @@ public final class CognitoStack extends Stack {
                                        .tempPasswordValidity(tempPasswordValidityDays)
                                        .build();
     return UserPool.Builder.create(scope, "userPool")
-                           .userPoolName(applicationEnvironment.prefixed("user-pool"))
+                           .userPoolName(appEnv.prefixed("user-pool"))
                            .selfSignUpEnabled(inParams.isSelfSignUpEnabled())
                            .accountRecovery(inParams.getAccountRecovery())
                            .autoVerify(autoVerifyEmail)
@@ -148,35 +169,35 @@ public final class CognitoStack extends Stack {
                            .build();
   }
 
-  private static UserPoolClient userPoolClient(Construct scope, IUserPool userPool,
-                                               InputParameters inParams) {
-    var callbackUrls = join(inParams.getUserPoolOauthCallBackUrls(), inParams.getAppLoginUrl());
-    var logoutUrls = List.of(inParams.getApplicationUrl());
+  private static UserPoolClient userPoolClient(Stack scope, IUserPool userPool,
+                                               UserPoolClientParameter clientParam) {
+    var callbacks = join(clientParam.getUserPoolOauthCallBackUrls(), clientParam.getAppLoginUrl());
+    var logoutUrls = List.of(clientParam.getApplicationUrl());
     var flows = OAuthFlows.builder()
-                          .authorizationCodeGrant(inParams.isFlowAuthorizationCodeGrantEnabled())
-                          .implicitCodeGrant(inParams.isFlowImplicitCodeGrantEnabled())
-                          .clientCredentials(inParams.isFlowClientCredentialsEnabled())
+                          .authorizationCodeGrant(clientParam.isFlowAuthorizationCodeGrantEnabled())
+                          .implicitCodeGrant(clientParam.isFlowImplicitCodeGrantEnabled())
+                          .clientCredentials(clientParam.isFlowClientCredentialsEnabled())
                           .build();
     var oAuthConf = OAuthSettings.builder()
-                                 .callbackUrls(callbackUrls)
+                                 .callbackUrls(callbacks)
                                  .logoutUrls(logoutUrls)
                                  .flows(flows)
-                                 .scopes(List.of(OAuthScope.EMAIL, OAuthScope.OPENID,
-                                                 OAuthScope.PROFILE))
+                                 .scopes(clientParam.getScopes())
                                  .build();
-    var identityProviders = join(inParams.getUserPoolSuppoertedIdentityProviders(),
+    var identityProviders = join(clientParam.getUserPoolSuppoertedIdentityProviders(),
                                  UserPoolClientIdentityProvider.COGNITO);
 
-    return UserPoolClient.Builder.create(scope, "userPoolClient")
-                                 .userPoolClientName(inParams.getApplicationName() + "-client")
-                                 .generateSecret(inParams.isUserPoolGenerateSecret())
+    var clientName = clientName(clientParam.getApplicationName());
+    return UserPoolClient.Builder.create(scope, "userPoolClient" + clientName)
+                                 .userPoolClientName(clientName)
+                                 .generateSecret(true)
                                  .userPool(userPool)
                                  .oAuth(oAuthConf)
                                  .supportedIdentityProviders(identityProviders)
                                  .build();
   }
 
-  private static void createUserPoolDomain(Construct scope, IUserPool userPool,
+  private static void createUserPoolDomain(Stack scope, IUserPool userPool,
                                            InputParameters inParams) {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooldomain.html#cfn-cognito-userpooldomain-customdomainconfig
     var cognitoDomain = CognitoDomainOptions.builder()
@@ -188,8 +209,8 @@ public final class CognitoStack extends Stack {
                           .build();
   }
 
-  private static void createStringParameter(Construct scope, ApplicationEnvironment appEnv,
-                                            String id, String value) {
+  private static void createStringParameter(Stack scope, ApplicationEnvironment appEnv, String id,
+                                            String value) {
     StringParameter.Builder.create(scope, id)
                            .parameterName(createParameterName(appEnv, id))
                            .stringValue(value)
@@ -207,32 +228,34 @@ public final class CognitoStack extends Stack {
                  .collect(toList());
   }
 
-  private static ISecret userPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
-                                              String userPoolClientId, String userPoolClientName,
-                                              String secretName) {
+  private static String createUserPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
+                                                   String userPoolClientId, String clientName,
+                                                   String secretName) {
     var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
                                                               userPoolClientId);
     var secretTpl = String.format("{\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\"}",
                                   USER_POOL_ID_HOLDER, userPoolId,
                                   USER_POOL_CLIENT_ID_HOLDER, userPoolClientId,
-                                  USER_POOL_CLIENT_NAME_HOLDER, userPoolClientName,
+                                  USER_POOL_CLIENT_NAME_HOLDER, clientName,
                                   USER_POOL_CLIENT_SECRET_HOLDER, userPoolClientSecretValue);
     var secretString = SecretStringGenerator.builder()
                                             .secretStringTemplate(secretTpl)
                                             // to please AWS CDK
                                             // see https://github.com/aws/aws-cdk/issues/5810
                                             .generateStringKey("ignored")
-                                            .passwordLength(20)
+                                            .passwordLength(10)
                                             .build();
-    return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET_HOLDER)
-                         .secretName(secretName)
-                         .description("Secret holding the user pool client secret values")
+    return Secret.Builder.create(scope, USER_POOL_CLIENT_SECRET_HOLDER + clientName)
+                         .secretName(secretName + userPoolClientId)
+                         .description("Secret holding the user pool client (" + clientName
+                                      + ") secret values")
                          .generateSecretString(secretString)
-                         .build();
+                         .build()
+                         .getSecretArn();
   }
 
-  private static String userPoolClientSecretValue(Stack scope, String awsRegion,
-                                                  String userPoolId, String userPoolClientId) {
+  private static String userPoolClientSecretValue(Stack scope, String awsRegion, String userPoolId,
+                                                  String userPoolClientId) {
     // The UserPoolClient secret, can't be accessed directly
     // This custom resource will call the AWS API to get the secret,
     // See: https://github.com/aws/aws-cdk/issues/7225
@@ -250,7 +273,8 @@ public final class CognitoStack extends Stack {
     var policy = AwsCustomResourcePolicy.fromSdkCalls(SdkCallsPolicyOptions.builder()
                                                                            .resources(ANY_RESOURCE)
                                                                            .build());
-    var userPoolResource = AwsCustomResource.Builder.create(scope, "describeUserPool")
+    var id = "describeUserPool" + userPoolClientId;
+    var userPoolResource = AwsCustomResource.Builder.create(scope, id)
                                                     .resourceType(resourceType)
                                                     .installLatestAwsSdk(false)
                                                     .onUpdate(userPoolClientMetadata)
@@ -262,54 +286,52 @@ public final class CognitoStack extends Stack {
   // endregion
 
   // region get output params
-  public static OutputParameters getOutputParameters(Construct scope,
-                                                     ApplicationEnvironment appEnvironment) {
-    return new OutputParameters(getParameterUserPoolClientSecretArn(scope, appEnvironment),
-                                getParameterLogoutUrl(scope, appEnvironment),
-                                getParameterUserPoolProviderUrl(scope, appEnvironment));
+
+  /**
+   * Returns the output parameters from this stack creation except the user pool clients secret
+   * ARNs. To retrieve those a call to
+   * {@link CognitoStack#getParameterUserPoolClientSecretArn(Stack, ApplicationEnvironment)}
+   * should be executed for each application environment for which an user pool client was
+   * configured.
+   *
+   * @param scope  Scope to retrieve the parameters from.
+   * @param appEnv {@link ApplicationEnvironment} associated to these parameters.
+   *
+   * @return An {@link OutputParameters} instance with the values.
+   *
+   * @see CognitoStack#getParameterUserPoolClientSecretArn(Stack, ApplicationEnvironment)
+   */
+  public static OutputParameters getOutputParameters(Stack scope, ApplicationEnvironment appEnv) {
+    return new OutputParameters(getParameterLogoutUrl(scope, appEnv),
+                                getParameterUserPoolProviderUrl(scope, appEnv));
   }
 
-  public static String getParameter(Construct scope, ApplicationEnvironment applicationEnvironment,
-                                    String id) {
-    return StringParameter.fromStringParameterName(scope, id,
-                                                   createParameterName(applicationEnvironment, id))
+  public static String getParameter(Stack scope, ApplicationEnvironment appEnv, String id) {
+    return StringParameter.fromStringParameterName(scope, id, createParameterName(appEnv, id))
                           .getStringValue();
   }
 
-  public static String getParameterUserPoolClientSecretArn(Construct scope,
-                                                           ApplicationEnvironment appEnvironment) {
-    return getParameter(scope, appEnvironment, PARAM_USER_POOL_CLIENT_SECRET_ARN);
+  public static String getParameterUserPoolClientSecretArn(Stack scope,
+                                                           ApplicationEnvironment appEnv) {
+    var clientName = clientName(appEnv.getApplicationName());
+    return getParameter(scope, appEnv, clientSecretArnParamHolder(clientName));
   }
 
-  public static String getParameterLogoutUrl(Construct scope,
-                                             ApplicationEnvironment applicationEnvironment) {
-    return getParameter(scope, applicationEnvironment, PARAM_USER_POOL_LOGOUT_URL);
+  public static String getParameterLogoutUrl(Stack scope, ApplicationEnvironment appEnv) {
+    return getParameter(scope, appEnv, PARAM_USER_POOL_LOGOUT_URL);
   }
 
-  public static String getParameterUserPoolProviderUrl(Construct scope,
-                                                       ApplicationEnvironment appEnvironment) {
-    return getParameter(scope, appEnvironment, PARAM_USER_POOL_PROVIDER_URL);
+  public static String getParameterUserPoolProviderUrl(Stack scope, ApplicationEnvironment appEnv) {
+    return getParameter(scope, appEnv, PARAM_USER_POOL_PROVIDER_URL);
   }
   // endregion
 
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static final class InputParameters {
-    // https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-integration.html
-    static final String DEFAULT_COGNITO_LOGOUT_URL_TPL
-        = "https://%s.auth.%s.amazoncognito.com/logout";
-    static final String DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE
-        = "%s/login/oauth2/code/cognito";
-
     @lombok.Builder.Default
     private String cognitoLogoutUrlTemplate = DEFAULT_COGNITO_LOGOUT_URL_TPL;
-    @lombok.Builder.Default
-    private String cognitoOauthLoginUrlTemplate = DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE;
-
     private String loginPageDomainPrefix;
-
-    private String applicationName;
-    private String applicationUrl;
 
     private boolean selfSignUpEnabled;
     @lombok.Builder.Default
@@ -344,19 +366,32 @@ public final class CognitoStack extends Stack {
     private int tempPasswordValidityInDays = 7;
 
     @lombok.Builder.Default
-    private boolean userPoolGenerateSecret = true;
-    @lombok.Builder.Default
-    private List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
-    @lombok.Builder.Default
-    private List<String> userPoolOauthCallBackUrls = emptyList();
-
-    private boolean flowAuthorizationCodeGrantEnabled;
-    private boolean flowImplicitCodeGrantEnabled;
-    private boolean flowClientCredentialsEnabled;
+    private List<UserPoolClientParameter> userPoolClientConfigurations = emptyList();
 
     String getFullLogoutUrlForRegion(String region) {
       return String.format(getCognitoLogoutUrlTemplate(), getLoginPageDomainPrefix(), region);
     }
+  }
+
+  @lombok.Builder
+  @Getter(AccessLevel.PACKAGE)
+  public static final class UserPoolClientParameter {
+    @lombok.Builder.Default
+    private String cognitoOauthLoginUrlTemplate = DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE;
+
+    private String applicationName;
+    private String applicationUrl;
+
+    @lombok.Builder.Default
+    private List<String> userPoolOauthCallBackUrls = emptyList();
+    private boolean flowAuthorizationCodeGrantEnabled;
+    private boolean flowImplicitCodeGrantEnabled;
+    private boolean flowClientCredentialsEnabled;
+    @lombok.Builder.Default
+    private List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
+    @lombok.Builder.Default
+    private List<OAuthScope> scopes = List.of(OAuthScope.EMAIL, OAuthScope.OPENID,
+                                              OAuthScope.PROFILE);
 
     String getAppLoginUrl() {
       return String.format(getCognitoOauthLoginUrlTemplate(), getApplicationUrl());
@@ -366,7 +401,6 @@ public final class CognitoStack extends Stack {
   @Getter
   @AllArgsConstructor(access = AccessLevel.PACKAGE)
   public static final class OutputParameters {
-    private final String userPoolClientSecretArn;
     private final String logoutUrl;
     private final String providerUrl;
   }
