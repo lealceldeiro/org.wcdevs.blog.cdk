@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
 import software.amazon.awscdk.core.Environment;
+import software.amazon.awscdk.core.Stack;
 import software.amazon.awscdk.customresources.AwsCustomResourcePolicy;
 import software.amazon.awscdk.customresources.PhysicalResourceId;
 import software.amazon.awscdk.services.cognito.AccountRecovery;
@@ -17,6 +18,7 @@ import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -78,15 +80,18 @@ class CognitoStackTest {
         var awsEnvironment = mock(Environment.class);
         when(awsEnvironment.getRegion()).thenReturn(randomString());
 
-        var inParams = mock(CognitoStack.InputParameters.class);
-        when(inParams.getApplicationUrl()).thenReturn(randomString());
-        when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
-        when(inParams.isFlowClientCredentialsEnabled()).thenReturn(false);
-        when(inParams.isFlowImplicitCodeGrantEnabled()).thenReturn(false);
-        when(inParams.isFlowAuthorizationCodeGrantEnabled()).thenReturn(true);
+        var clientParams = mock(CognitoStack.UserPoolClientParameter.class);
+        when(clientParams.getApplicationUrl()).thenReturn(randomString());
+        when(clientParams.isFlowClientCredentialsEnabled()).thenReturn(false);
+        when(clientParams.isFlowImplicitCodeGrantEnabled()).thenReturn(false);
+        when(clientParams.isFlowAuthorizationCodeGrantEnabled()).thenReturn(true);
 
-        var actual = CognitoStack.newInstance(scope, randomString(), awsEnvironment,
-                                              applicationEnvironment, inParams);
+        var inParams = mock(CognitoStack.InputParameters.class);
+        when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
+        when(inParams.getUserPoolClientConfigurations()).thenReturn(List.of(clientParams));
+
+        var actual = CognitoStack.newInstance(scope, awsEnvironment, applicationEnvironment,
+                                              inParams);
         assertNotNull(actual);
       }
     });
@@ -106,21 +111,39 @@ class CognitoStackTest {
       mockedStringParameter
           .when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
           .thenReturn(stringParamMock);
-      var actual = CognitoStack.getOutputParameters(mock(Construct.class),
+      var actual = CognitoStack.getOutputParameters(mock(Stack.class),
                                                     mock(ApplicationEnvironment.class));
       assertNotNull(actual);
       assertEquals(expected, actual.getLogoutUrl());
       assertEquals(expected, actual.getProviderUrl());
-      assertEquals(expected, actual.getUserPoolClientSecretArn());
     }
+  }
+
+  @Test
+  void clientInputParametersWithDefaults() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = CognitoStack.UserPoolClientParameter.builder().build();
+      assertNull(input.getApplicationName());
+      assertNull(input.getApplicationUrl());
+      assertTrue(input.getUserPoolSuppoertedIdentityProviders().isEmpty());
+      assertTrue(input.getUserPoolOauthCallBackUrls().isEmpty());
+      assertFalse(input.isFlowAuthorizationCodeGrantEnabled());
+      assertFalse(input.isFlowImplicitCodeGrantEnabled());
+      assertFalse(input.isFlowClientCredentialsEnabled());
+      assertEquals(CognitoStack.DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE,
+                   input.getCognitoOauthLoginUrlTemplate());
+      assertEquals(3, input.getScopes().size());
+
+      var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
+                                           input.getApplicationUrl());
+      assertEquals(expectedLoginUrl, input.getAppLoginUrl());
+    });
   }
 
   @Test
   void inputParametersWithDefaults() {
     var input = CognitoStack.InputParameters.builder().build();
     assertNull(input.getLoginPageDomainPrefix());
-    assertNull(input.getApplicationName());
-    assertNull(input.getApplicationUrl());
     assertFalse(input.isSelfSignUpEnabled());
     assertEquals(AccountRecovery.EMAIL_ONLY, input.getAccountRecovery());
     assertFalse(input.isSignInAutoVerifyEmail());
@@ -140,40 +163,43 @@ class CognitoStackTest {
     assertTrue(input.isPasswordRequireUppercase());
     assertEquals(8, input.getPasswordMinLength());
     assertEquals(7, input.getTempPasswordValidityInDays());
-    assertTrue(input.isUserPoolGenerateSecret());
-    assertTrue(input.getUserPoolSuppoertedIdentityProviders().isEmpty());
-    assertTrue(input.getUserPoolOauthCallBackUrls().isEmpty());
-    assertFalse(input.isFlowAuthorizationCodeGrantEnabled());
-    assertFalse(input.isFlowImplicitCodeGrantEnabled());
-    assertFalse(input.isFlowClientCredentialsEnabled());
+    assertTrue(input.getUserPoolClientConfigurations().isEmpty());
 
-    assertEquals(CognitoStack.InputParameters.DEFAULT_COGNITO_LOGOUT_URL_TPL,
+    assertEquals(CognitoStack.DEFAULT_COGNITO_LOGOUT_URL_TPL,
                  input.getCognitoLogoutUrlTemplate());
     var region = randomString();
     var expectedLogoutUrl = String.format(input.getCognitoLogoutUrlTemplate(),
                                           input.getLoginPageDomainPrefix(),
                                           region);
     assertEquals(expectedLogoutUrl, input.getFullLogoutUrlForRegion(region));
-
-    assertEquals(CognitoStack.InputParameters.DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE,
-                 input.getCognitoOauthLoginUrlTemplate());
-    var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
-                                         input.getApplicationUrl());
-    assertEquals(expectedLoginUrl, input.getAppLoginUrl());
   }
 
   @Test
   void getUserPoolClientSecret() {
-    var arn = randomString();
+    var envName = randomString();
+    var appName = randomString();
     var secretMock = mock(ISecret.class);
 
-    try (var mockedSecret = mockStatic(Secret.class)) {
-      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), any(), eq(arn)))
-                  .thenReturn(secretMock);
-      var output = mock(CognitoStack.OutputParameters.class);
-      when(output.getUserPoolClientSecretArn()).thenReturn(arn);
+    var clientName = Util.joinedString(Util.DASH_JOINER, appName, "up", "client");
+    var arnParamHolder = CognitoStack.PARAM_USER_POOL_CLIENT_SECRET_ARN
+                         + clientName;
+    var arn = randomString();
 
-      assertEquals(secretMock, CognitoStack.getUserPoolClientSecret(mock(Construct.class), output));
+    try (
+        var mockedSecret = mockStatic(Secret.class);
+        var mockedStringParameter = mockStatic(StringParameter.class)
+    ) {
+      var stringParam = mock(IStringParameter.class);
+      when(stringParam.getStringValue()).thenReturn(arn);
+      mockedStringParameter.when(() -> StringParameter.fromStringParameterName(any(), any(), any()))
+                           .thenReturn(stringParam);
+      mockedSecret.when(() -> Secret.fromSecretCompleteArn(any(), eq(arnParamHolder), eq(arn)))
+                  .thenReturn(secretMock);
+      var appEnv = mock(ApplicationEnvironment.class);
+      when(appEnv.getEnvironmentName()).thenReturn(envName);
+      when(appEnv.getApplicationName()).thenReturn(appName);
+
+      assertEquals(secretMock, CognitoStack.getUserPoolClientSecret(mock(Stack.class), appEnv));
     }
   }
 }

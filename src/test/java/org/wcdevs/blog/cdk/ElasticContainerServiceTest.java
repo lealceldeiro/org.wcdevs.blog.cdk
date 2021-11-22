@@ -266,4 +266,19 @@ class ElasticContainerServiceTest {
       assertEquals(unhealthyThresholdCount, actual.getUnhealthyThresholdCount());
     });
   }
+
+  @Test
+  void dockerImage() {
+    var dockerImageUrl = randomString();
+    var dockerImageTag = randomString();
+    var dockerRepositoryName = randomString();
+    var dockerImage = ElasticContainerService.DockerImage.builder()
+                                                         .dockerImageUrl(dockerImageUrl)
+                                                         .dockerImageTag(dockerImageTag)
+                                                         .dockerRepositoryName(dockerRepositoryName)
+                                                         .build();
+    assertEquals(dockerImageUrl, dockerImage.getDockerImageUrl());
+    assertEquals(dockerImageTag, dockerImage.getDockerImageTag());
+    assertEquals(dockerRepositoryName, dockerImage.getDockerRepositoryName());
+  }
 }
