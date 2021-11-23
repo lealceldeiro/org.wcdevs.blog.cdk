@@ -18,6 +18,7 @@ import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -117,19 +117,55 @@ class CognitoStackTest {
   }
 
   @Test
-  void clientInputParametersWithDefaults() {
+  void clientInputParameters() {
+    var random = new SecureRandom();
+
     StaticallyMockedCdk.executeTest(() -> {
-      var input = CognitoStack.UserPoolClientParameter.builder().build();
-      assertNull(input.getApplicationName());
-      assertNull(input.getApplicationUrl());
-      assertTrue(input.getUserPoolSuppoertedIdentityProviders().isEmpty());
-      assertTrue(input.getUserPoolOauthCallBackUrls().isEmpty());
-      assertFalse(input.isFlowAuthorizationCodeGrantEnabled());
-      assertFalse(input.isFlowImplicitCodeGrantEnabled());
-      assertFalse(input.isFlowClientCredentialsEnabled());
-      assertEquals(CognitoStack.DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE,
-                   input.getCognitoOauthLoginUrlTemplate());
-      assertEquals(3, input.getScopes().size());
+      var applicationName = randomString();
+      var applicationUrl = randomString();
+      var userPoolOauthCallBackUrls = List.of(randomString());
+      var flowAuthorizationCodeGrantEnabled = random.nextBoolean();
+      var flowImplicitCodeGrantEnabled = random.nextBoolean();
+      var userPoolSuppoertedIdentityProviders = List.of(mock(UserPoolClientIdentityProvider.class));
+      var accessTokenValidity = mock(Duration.class);
+      var scopes = List.of(mock(OAuthScope.class));
+      var idTokenValidity = mock(Duration.class);
+      var tokenRevocationEnabled = random.nextBoolean();
+      var returnGenericErrorOnLoginFailed = random.nextBoolean();
+      var flowClientCredentialsEnabled = random.nextBoolean();
+
+      var refreshTokenValidity = mock(Duration.class);
+      var input = CognitoStack.UserPoolClientParameter
+          .builder()
+          .applicationName(applicationName)
+          .applicationUrl(applicationUrl)
+          .userPoolOauthCallBackUrls(userPoolOauthCallBackUrls)
+          .flowAuthorizationCodeGrantEnabled(flowAuthorizationCodeGrantEnabled)
+          .flowImplicitCodeGrantEnabled(flowImplicitCodeGrantEnabled)
+          .flowClientCredentialsEnabled(flowClientCredentialsEnabled)
+          .userPoolSuppoertedIdentityProviders(userPoolSuppoertedIdentityProviders)
+          .scopes(scopes)
+          .accessTokenValidity(accessTokenValidity)
+          .idTokenValidity(idTokenValidity)
+          .refreshTokenValidity(refreshTokenValidity)
+          .tokenRevocationEnabled(tokenRevocationEnabled)
+          .returnGenericErrorOnLoginFailed(returnGenericErrorOnLoginFailed)
+          .build();
+
+      assertEquals(applicationName, input.getApplicationName());
+      assertEquals(applicationUrl, input.getApplicationUrl());
+      assertEquals(userPoolOauthCallBackUrls, input.getUserPoolOauthCallBackUrls());
+      assertEquals(flowAuthorizationCodeGrantEnabled, input.isFlowAuthorizationCodeGrantEnabled());
+      assertEquals(flowImplicitCodeGrantEnabled, input.isFlowImplicitCodeGrantEnabled());
+      assertEquals(flowClientCredentialsEnabled, input.isFlowClientCredentialsEnabled());
+      assertEquals(userPoolSuppoertedIdentityProviders,
+                   input.getUserPoolSuppoertedIdentityProviders());
+      assertEquals(scopes, input.getScopes());
+      assertEquals(accessTokenValidity, input.getAccessTokenValidity());
+      assertEquals(idTokenValidity, input.getIdTokenValidity());
+      assertEquals(refreshTokenValidity, input.getRefreshTokenValidity());
+      assertEquals(tokenRevocationEnabled, input.isTokenRevocationEnabled());
+      assertEquals(returnGenericErrorOnLoginFailed, input.isReturnGenericErrorOnLoginFailed());
 
       var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
                                            input.getApplicationUrl());

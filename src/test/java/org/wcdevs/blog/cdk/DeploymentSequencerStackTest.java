@@ -120,7 +120,9 @@ class DeploymentSequencerStackTest {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void suffixDependeOnFifoProp(boolean fifo) {
-    var input = DeploymentSequencerStack.InputParameters.builder().fifo(fifo).build();
-    assertEquals(fifo, input.getQueueName().endsWith(".fifo"));
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = DeploymentSequencerStack.InputParameters.builder().fifo(fifo).build();
+      assertEquals(fifo, input.getQueueName().endsWith(".fifo"));
+    });
   }
 }
