@@ -116,4 +116,11 @@ class DeploymentSequencerStackTest {
       assertEquals(concurrentExecutions, input.getReservedConcurrentExecutions());
     });
   }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void suffixDependeOnFifoProp(boolean fifo) {
+    var input = DeploymentSequencerStack.InputParameters.builder().fifo(fifo).build();
+    assertEquals(fifo, input.getQueueName().endsWith(".fifo"));
+  }
 }
