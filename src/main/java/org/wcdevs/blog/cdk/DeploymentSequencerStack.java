@@ -20,31 +20,31 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class DeploymentSequencerStack extends Stack {
-  private static final String QUEUE_ID = "deploymentsQueue";
   private static final String GITHUB_TOKEN_KEY = "GITHUB_TOKEN";
   private static final String QUEUE_URL_KEY = "QUEUE_URL";
   private static final String REGION_KEY = "REGION";
+  private static final String FUNCTION_ID = "depSeqFun";
 
   private DeploymentSequencerStack(Construct scope, String id, StackProps props) {
     super(Objects.requireNonNull(scope), Objects.requireNonNull(id), Objects.requireNonNull(props));
   }
 
-  public static DeploymentSequencerStack newInstance(Construct scope, String id,
-                                                     Environment awsEnvironment,
-                                                     String applicationName,
+  public static DeploymentSequencerStack newInstance(Construct scope, Environment awsEnvironment,
+                                                     ApplicationEnvironment applicationEnvironment,
                                                      InputParameters inputParameters) {
     var inParams = Objects.requireNonNull(inputParameters);
+    var appEnv = Objects.requireNonNull(applicationEnvironment);
 
-    var stackName = Util.joinedString("-", applicationName, "deployments", "stack");
+    var name = appEnv.prefixed(Util.joinedString(Util.DASH_JOINER, "deployment", "seq", "stack"));
     var stackProps = StackProps.builder()
-                               .stackName(stackName)
+                               .stackName(name)
                                .env(awsEnvironment)
                                .build();
-    var stack = new DeploymentSequencerStack(scope, id, stackProps);
+    var stack = new DeploymentSequencerStack(scope, name, stackProps);
 
-    var queueName = Util.joinedString("-", applicationName, inParams.getQueueName());
-    var deploymentQueue = Queue.Builder.create(stack, QUEUE_ID)
-                                       .queueName(queueName + (inParams.isFifo() ? ".fifo" : ""))
+    var queueName = appEnv.prefixed(inParams.getQueueName());
+    var deploymentQueue = Queue.Builder.create(stack, queueName)
+                                       .queueName(queueName)
                                        .fifo(inParams.isFifo())
                                        .build();
     var eventSource = SqsEventSource.Builder.create(deploymentQueue).build();
@@ -66,15 +66,18 @@ public final class DeploymentSequencerStack extends Stack {
                        .events(List.of(eventSource))
                        .environment(envVars)
                        .build();
+    var fnId = appEnv.prefixed(FUNCTION_ID);
+    LambdaFunction.Builder.create(new Function(stack, fnId, functionProps)).build();
 
-    LambdaFunction.Builder.create(new Function(stack, "deploymentSequencerFunction", functionProps))
-                          .build();
     return stack;
   }
 
   @lombok.Builder
   @Getter(AccessLevel.PACKAGE)
   public static class InputParameters {
+    private static final String FIFO_SUFFIX = ".fifo";
+    private static final String QUEUE_ID = "depQueue";
+
     /**
      * Path to the ZIP file containing the lambda function. This attribute is required.
      */
@@ -102,5 +105,13 @@ public final class DeploymentSequencerStack extends Stack {
     private String queueUrlKey = QUEUE_URL_KEY;
     @lombok.Builder.Default
     private String regionKey = REGION_KEY;
+
+    String getQueueName() {
+      return this.queueName + suffix();
+    }
+
+    private String suffix() {
+      return isFifo() ? FIFO_SUFFIX : "";
+    }
   }
 }
