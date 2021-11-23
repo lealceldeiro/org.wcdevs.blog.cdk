@@ -50,10 +50,10 @@ public final class CognitoStack extends Stack {
   // https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-integration.html
   static final String DEFAULT_COGNITO_LOGOUT_URL_TPL
       = "https://%s.auth.%s.amazoncognito.com/logout";
-  static final String DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE
+  private static final String DEFAULT_COGNITO_OAUTH_LOGIN_URL_TEMPLATE
       = "%s/login/oauth2/code/cognito";
 
-  static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
+  private static final String PARAM_USER_POOL_CLIENT_SECRET_ARN = "userPoolClientSecretArn";
   private static final String PARAM_USER_POOL_LOGOUT_URL = "userPoolLogoutUrl";
   private static final String PARAM_USER_POOL_PROVIDER_URL = "userPoolProviderUrl";
 
@@ -179,13 +179,19 @@ public final class CognitoStack extends Stack {
                                  UserPoolClientIdentityProvider.COGNITO);
 
     var clientName = clientName(clientParam.getApplicationName());
-    return UserPoolClient.Builder.create(scope, "userPoolClient" + clientName)
-                                 .userPoolClientName(clientName)
-                                 .generateSecret(true)
-                                 .userPool(userPool)
-                                 .oAuth(oAuthConf)
-                                 .supportedIdentityProviders(identityProviders)
-                                 .build();
+    return UserPoolClient.Builder
+        .create(scope, "userPoolClient" + clientName)
+        .userPoolClientName(clientName)
+        .generateSecret(true)
+        .userPool(userPool)
+        .oAuth(oAuthConf)
+        .supportedIdentityProviders(identityProviders)
+        .accessTokenValidity(clientParam.getAccessTokenValidity())
+        .idTokenValidity(clientParam.getIdTokenValidity())
+        .refreshTokenValidity(clientParam.getRefreshTokenValidity())
+        .enableTokenRevocation(clientParam.isTokenRevocationEnabled())
+        .preventUserExistenceErrors(clientParam.isReturnGenericErrorOnLoginFailed())
+        .build();
   }
 
   private static void createUserPoolDomain(Stack scope, IUserPool userPool,
@@ -392,6 +398,15 @@ public final class CognitoStack extends Stack {
     @lombok.Builder.Default
     private List<OAuthScope> scopes = List.of(OAuthScope.EMAIL, OAuthScope.OPENID,
                                               OAuthScope.PROFILE);
+    @lombok.Builder.Default
+    private Duration accessTokenValidity = Duration.hours(1);
+    @lombok.Builder.Default
+    private Duration idTokenValidity = Duration.hours(1);
+    @lombok.Builder.Default
+    private Duration refreshTokenValidity = Duration.days(15);
+    private boolean tokenRevocationEnabled;
+    @lombok.Builder.Default
+    private boolean returnGenericErrorOnLoginFailed = true;
 
     String getAppLoginUrl() {
       return String.format(getCognitoOauthLoginUrlTemplate(), getApplicationUrl());
