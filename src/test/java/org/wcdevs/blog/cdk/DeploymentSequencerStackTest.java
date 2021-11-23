@@ -51,7 +51,8 @@ class DeploymentSequencerStackTest {
         mockedFunctionProps.when(FunctionProps::builder).thenReturn(functionPropsBuilderMock);
 
         var scope = mock(Construct.class);
-        var id = randomString();
+        var appEnv = mock(ApplicationEnvironment.class);
+        when(appEnv.prefixed(any())).thenReturn(randomString());
 
         var awsEnv = mock(Environment.class);
         when(awsEnv.getRegion()).thenReturn(randomString());
@@ -65,8 +66,7 @@ class DeploymentSequencerStackTest {
         when(inputParams.getQueueUrlKey()).thenReturn(randomString());
         when(inputParams.getRegionKey()).thenReturn(randomString());
 
-        var actual = DeploymentSequencerStack.newInstance(scope, id, awsEnv, randomString(),
-                                                          inputParams);
+        var actual = DeploymentSequencerStack.newInstance(scope, awsEnv, appEnv, inputParams);
         assertNotNull(actual);
       }
     });
@@ -104,7 +104,7 @@ class DeploymentSequencerStackTest {
           .build();
       assertNotNull(input);
       assertEquals(fifo, input.isFifo());
-      assertEquals(queueName, input.getQueueName());
+      assertEquals(queueName + (fifo ? ".fifo" : ""), input.getQueueName());
       assertEquals(codeDirectory, input.getCodeDirectory());
       assertEquals(githubToken, input.getGithubToken());
       assertEquals(githubTokenKey, input.getGithubTokenKey());
@@ -115,5 +115,12 @@ class DeploymentSequencerStackTest {
       assertEquals(runtime, input.getRuntime());
       assertEquals(concurrentExecutions, input.getReservedConcurrentExecutions());
     });
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void suffixDependeOnFifoProp(boolean fifo) {
+    var input = DeploymentSequencerStack.InputParameters.builder().fifo(fifo).build();
+    assertEquals(fifo, input.getQueueName().endsWith(".fifo"));
   }
 }
