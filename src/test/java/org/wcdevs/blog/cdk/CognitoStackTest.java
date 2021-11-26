@@ -1,6 +1,9 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
 import software.amazon.awscdk.core.Environment;
@@ -19,22 +22,35 @@ import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
 
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 class CognitoStackTest {
-  @Test
-  void newInstance() {
+  static Stream<Arguments> newInstanceArgs() {
+    return Stream.of(arguments(true, true, true),
+                     arguments(false, true, true),
+                     arguments(true, false, true),
+                     arguments(true, true, false),
+                     arguments(false, false, true),
+                     arguments(true, false, false));
+  }
+
+  @ParameterizedTest
+  @MethodSource("newInstanceArgs")
+  void newInstance(boolean scopesConfigured, boolean flowsEnabled, boolean oauthDisabled) {
     StaticallyMockedCdk.executeTest(() -> {
       try (
           var mockedDuration = mockStatic(Duration.class);
@@ -84,6 +100,9 @@ class CognitoStackTest {
         when(clientParams.isFlowClientCredentialsEnabled()).thenReturn(false);
         when(clientParams.isFlowImplicitCodeGrantEnabled()).thenReturn(false);
         when(clientParams.isFlowAuthorizationCodeGrantEnabled()).thenReturn(true);
+        when(clientParams.isThereAScopeConfigured()).thenReturn(scopesConfigured);
+        when(clientParams.isThereAFlowEnabled()).thenReturn(flowsEnabled);
+        when(clientParams.isOauthDisabled()).thenReturn(oauthDisabled);
 
         var inParams = mock(CognitoStack.InputParameters.class);
         when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
@@ -133,8 +152,9 @@ class CognitoStackTest {
       var tokenRevocationEnabled = random.nextBoolean();
       var returnGenericErrorOnLoginFailed = random.nextBoolean();
       var flowClientCredentialsEnabled = random.nextBoolean();
-
       var refreshTokenValidity = mock(Duration.class);
+      var oauthDisabled = random.nextBoolean();
+
       var input = CognitoStack.UserPoolClientParameter
           .builder()
           .applicationName(applicationName)
@@ -150,6 +170,7 @@ class CognitoStackTest {
           .refreshTokenValidity(refreshTokenValidity)
           .tokenRevocationEnabled(tokenRevocationEnabled)
           .returnGenericErrorOnLoginFailed(returnGenericErrorOnLoginFailed)
+          .oauthDisabled(oauthDisabled)
           .build();
 
       assertEquals(applicationName, input.getApplicationName());
@@ -166,10 +187,71 @@ class CognitoStackTest {
       assertEquals(refreshTokenValidity, input.getRefreshTokenValidity());
       assertEquals(tokenRevocationEnabled, input.isTokenRevocationEnabled());
       assertEquals(returnGenericErrorOnLoginFailed, input.isReturnGenericErrorOnLoginFailed());
+      assertEquals(oauthDisabled, input.isOauthDisabled());
 
       var expectedLoginUrl = String.format(input.getCognitoOauthLoginUrlTemplate(),
                                            input.getApplicationUrl());
       assertEquals(expectedLoginUrl, input.getAppLoginUrl());
+      var flowEnabled = flowAuthorizationCodeGrantEnabled || flowClientCredentialsEnabled
+                        || flowImplicitCodeGrantEnabled;
+      assertEquals(flowEnabled, input.isThereAFlowEnabled());
+      assertTrue(input.isThereAScopeConfigured());
+    });
+  }
+
+  private static Stream<Arguments> clientInputParametersScopesNotConfiguredArgs() {
+    return Stream.of(arguments(Collections.emptyList()), arguments((List<OAuthScope>) null));
+  }
+
+  @ParameterizedTest
+  @MethodSource("clientInputParametersScopesNotConfiguredArgs")
+  void clientInputParametersScopesNotConfigured(List<OAuthScope> scopes) {
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = CognitoStack.UserPoolClientParameter
+          .builder()
+          .scopes(scopes)
+          .build();
+      assertFalse(input.isThereAScopeConfigured());
+    });
+  }
+
+  @Test
+  void clientInputParametersScopesConfigured() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = CognitoStack.UserPoolClientParameter.builder()
+                                                      .scopes(List.of(mock(OAuthScope.class)))
+                                                      .build();
+      assertTrue(input.isThereAScopeConfigured());
+    });
+  }
+
+  static Stream<Arguments> clientInputParametersFlowsEnabledArgs() {
+    return Stream.of(arguments(true, false, false),
+                     arguments(false, true, false),
+                     arguments(false, false, true));
+  }
+
+  @ParameterizedTest
+  @MethodSource("clientInputParametersFlowsEnabledArgs")
+  void clientInputParametersFlowsEnabled(boolean flowClientCredentialsEnabled,
+                                         boolean flowImplicitCodeGrantEnabled,
+                                         boolean flowAuthorizationCodeGrantEnabled) {
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = CognitoStack.UserPoolClientParameter
+          .builder()
+          .flowClientCredentialsEnabled(flowClientCredentialsEnabled)
+          .flowImplicitCodeGrantEnabled(flowImplicitCodeGrantEnabled)
+          .flowAuthorizationCodeGrantEnabled(flowAuthorizationCodeGrantEnabled)
+          .build();
+      assertTrue(input.isThereAFlowEnabled());
+    });
+  }
+
+  @Test
+  void clientInputParametersFlowsNotEnabled() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var input = CognitoStack.UserPoolClientParameter.builder().build();
+      assertFalse(input.isThereAFlowEnabled());
     });
   }
 
