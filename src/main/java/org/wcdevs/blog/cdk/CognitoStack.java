@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -162,36 +163,48 @@ public final class CognitoStack extends Stack {
 
   private static UserPoolClient userPoolClient(Stack scope, IUserPool userPool,
                                                UserPoolClientParameter clientParam) {
-    var callbacks = join(clientParam.getUserPoolOauthCallBackUrls(), clientParam.getAppLoginUrl());
-    var logoutUrls = List.of(clientParam.getApplicationUrl());
-    var flows = OAuthFlows.builder()
-                          .authorizationCodeGrant(clientParam.isFlowAuthorizationCodeGrantEnabled())
-                          .implicitCodeGrant(clientParam.isFlowImplicitCodeGrantEnabled())
-                          .clientCredentials(clientParam.isFlowClientCredentialsEnabled())
-                          .build();
-    var oAuthConf = OAuthSettings.builder()
-                                 .callbackUrls(callbacks)
-                                 .logoutUrls(logoutUrls)
-                                 .flows(flows)
-                                 .scopes(clientParam.getScopes())
-                                 .build();
+    var oauthBuilder = OAuthSettings.builder();
+
+    if (!clientParam.isOauthDisabled()) {
+      var callbacks = join(clientParam.getUserPoolOauthCallBackUrls(),
+                           Optional.ofNullable(clientParam.getAppLoginUrl()).orElse("")
+                          ).stream().filter(s -> !s.isEmpty()).collect(toList());
+
+      oauthBuilder.callbackUrls(callbacks).logoutUrls(List.of(clientParam.getApplicationUrl()));
+
+      if (clientParam.isThereAScopeConfigured()) {
+        oauthBuilder.scopes(clientParam.getScopes());
+      }
+      if (clientParam.isThereAFlowEnabled()) {
+        oauthBuilder
+            .flows(OAuthFlows
+                       .builder()
+                       .authorizationCodeGrant(clientParam.isFlowAuthorizationCodeGrantEnabled())
+                       .implicitCodeGrant(clientParam.isFlowImplicitCodeGrantEnabled())
+                       .clientCredentials(clientParam.isFlowClientCredentialsEnabled())
+                       .build());
+      }
+    }
+
     var identityProviders = join(clientParam.getUserPoolSuppoertedIdentityProviders(),
                                  UserPoolClientIdentityProvider.COGNITO);
 
     var clientName = clientName(clientParam.getApplicationName());
-    return UserPoolClient.Builder
+    var builder = UserPoolClient.Builder
         .create(scope, "userPoolClient" + clientName)
         .userPoolClientName(clientName)
         .generateSecret(true)
         .userPool(userPool)
-        .oAuth(oAuthConf)
         .supportedIdentityProviders(identityProviders)
         .accessTokenValidity(clientParam.getAccessTokenValidity())
         .idTokenValidity(clientParam.getIdTokenValidity())
         .refreshTokenValidity(clientParam.getRefreshTokenValidity())
         .enableTokenRevocation(clientParam.isTokenRevocationEnabled())
-        .preventUserExistenceErrors(clientParam.isReturnGenericErrorOnLoginFailed())
-        .build();
+        .preventUserExistenceErrors(clientParam.isReturnGenericErrorOnLoginFailed());
+
+    return clientParam.isOauthDisabled()
+           ? builder.disableOAuth(true).build()
+           : builder.oAuth(oauthBuilder.build()).build();
   }
 
   private static void createUserPoolDomain(Stack scope, IUserPool userPool,
@@ -224,7 +237,7 @@ public final class CognitoStack extends Stack {
   @SafeVarargs
   private static <T> List<T> join(Collection<? extends T> additional, T... elements) {
     return Stream.concat(Stream.of(Objects.requireNonNull(elements)),
-                         Objects.requireNonNull(additional.stream()))
+                         Optional.ofNullable(additional).orElse(emptyList()).stream())
                  .collect(toList());
   }
 
@@ -389,15 +402,15 @@ public final class CognitoStack extends Stack {
     private String applicationUrl;
 
     @lombok.Builder.Default
-    private List<String> userPoolOauthCallBackUrls = emptyList();
+    private Collection<String> userPoolOauthCallBackUrls = emptyList();
     private boolean flowAuthorizationCodeGrantEnabled;
     private boolean flowImplicitCodeGrantEnabled;
     private boolean flowClientCredentialsEnabled;
     @lombok.Builder.Default
-    private List<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders = emptyList();
+    private List<OAuthScope> scopes = emptyList();
     @lombok.Builder.Default
-    private List<OAuthScope> scopes = List.of(OAuthScope.EMAIL, OAuthScope.OPENID,
-                                              OAuthScope.PROFILE);
+    private Collection<UserPoolClientIdentityProvider> userPoolSuppoertedIdentityProviders
+        = emptyList();
     @lombok.Builder.Default
     private Duration accessTokenValidity = Duration.hours(1);
     @lombok.Builder.Default
@@ -408,8 +421,19 @@ public final class CognitoStack extends Stack {
     @lombok.Builder.Default
     private boolean returnGenericErrorOnLoginFailed = true;
 
+    private boolean oauthDisabled;
+
     String getAppLoginUrl() {
       return String.format(getCognitoOauthLoginUrlTemplate(), getApplicationUrl());
+    }
+
+    boolean isThereAFlowEnabled() {
+      return isFlowAuthorizationCodeGrantEnabled() || isFlowImplicitCodeGrantEnabled()
+             || isFlowClientCredentialsEnabled();
+    }
+
+    boolean isThereAScopeConfigured() {
+      return Objects.nonNull(getScopes()) && !getScopes().isEmpty();
     }
   }
 
