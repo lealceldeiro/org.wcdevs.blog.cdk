@@ -1,0 +1,50 @@
+name: Feature Request
+description: Request a new feature
+title: "[Feature Request] "
+labels: ["feature"]
+assignees:
+  - lealceldeiro
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to help us improve our cdk library!
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: How can we get in touch with you if we need more info?
+      placeholder: (optional) ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: what-is-needed
+    attributes:
+      label: What new feature you'd like to see provided by the library?
+      description: Describe as much as possible the new feature you'd like to see included.
+      placeholder: Tell us what you think is missing in the library and we'll try to implement it
+    validations:
+      required: true
+  - type: textarea
+    id: alternative
+    attributes:
+      label: Have you considered any alternatives? Which?
+      description: Describe alternatives you've considered
+      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context about the feature request here.
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/lealceldeiro/org.wcdevs.blog.cdk/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
