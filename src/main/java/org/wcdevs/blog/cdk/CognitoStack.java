@@ -193,7 +193,7 @@ public final class CognitoStack extends Stack {
     var builder = UserPoolClient.Builder
         .create(scope, "userPoolClient" + clientName)
         .userPoolClientName(clientName)
-        .generateSecret(true)
+        .generateSecret(clientParam.isGenerateSecretEnabled())
         .userPool(userPool)
         .supportedIdentityProviders(identityProviders)
         .accessTokenValidity(clientParam.getAccessTokenValidity())
@@ -420,6 +420,8 @@ public final class CognitoStack extends Stack {
     private boolean tokenRevocationEnabled;
     @lombok.Builder.Default
     private boolean returnGenericErrorOnLoginFailed = true;
+    @lombok.Builder.Default
+    private boolean generateSecretEnabled = true;
 
     private boolean oauthDisabled;
 
