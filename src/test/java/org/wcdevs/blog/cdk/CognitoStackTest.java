@@ -15,6 +15,7 @@ import software.amazon.awscdk.services.cognito.Mfa;
 import software.amazon.awscdk.services.cognito.OAuthFlows;
 import software.amazon.awscdk.services.cognito.OAuthScope;
 import software.amazon.awscdk.services.cognito.OAuthSettings;
+import software.amazon.awscdk.services.cognito.UserPoolClient;
 import software.amazon.awscdk.services.cognito.UserPoolClientIdentityProvider;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
@@ -40,17 +41,24 @@ import static org.mockito.Mockito.when;
 
 class CognitoStackTest {
   static Stream<Arguments> newInstanceArgs() {
-    return Stream.of(arguments(true, true, true),
-                     arguments(false, true, true),
-                     arguments(true, false, true),
-                     arguments(true, true, false),
-                     arguments(false, false, true),
-                     arguments(true, false, false));
+    return Stream.of(arguments(true, true, true, true),
+                     arguments(false, true, true, true),
+                     arguments(true, false, true, true),
+                     arguments(true, true, false, true),
+                     arguments(false, false, true, true),
+                     arguments(true, false, false, true),
+                     arguments(true, true, true, false),
+                     arguments(false, true, true, false),
+                     arguments(true, false, true, false),
+                     arguments(true, true, false, false),
+                     arguments(false, false, true, false),
+                     arguments(true, false, false, false));
   }
 
   @ParameterizedTest
   @MethodSource("newInstanceArgs")
-  void newInstance(boolean scopesConfigured, boolean flowsEnabled, boolean oauthDisabled) {
+  void newInstance(boolean scopesConfigured, boolean flowsEnabled, boolean oauthDisabled,
+                   boolean generateClientSecret) {
     StaticallyMockedCdk.executeTest(() -> {
       try (
           var mockedDuration = mockStatic(Duration.class);
@@ -103,6 +111,7 @@ class CognitoStackTest {
         when(clientParams.isThereAScopeConfigured()).thenReturn(scopesConfigured);
         when(clientParams.isThereAFlowEnabled()).thenReturn(flowsEnabled);
         when(clientParams.isOauthDisabled()).thenReturn(oauthDisabled);
+        when(clientParams.isGenerateSecretEnabled()).thenReturn(generateClientSecret);
 
         var inParams = mock(CognitoStack.InputParameters.class);
         when(inParams.getLoginPageDomainPrefix()).thenReturn(randomString());
@@ -315,5 +324,17 @@ class CognitoStackTest {
 
       assertEquals(secretMock, CognitoStack.getUserPoolClientSecret(mock(Stack.class), appEnv));
     }
+  }
+
+  @Test
+  void userPoolClientSecretWrapper() {
+    StaticallyMockedCdk.executeTest(() -> {
+      var userPoolClient = mock(UserPoolClient.class);
+      var secretGenerated = new SecureRandom().nextBoolean();
+      var actual = new CognitoStack.UserPoolClientWrapper(userPoolClient, secretGenerated);
+
+      assertEquals(userPoolClient, actual.getClient());
+      assertEquals(secretGenerated, actual.isSecretGenerated());
+    });
   }
 }

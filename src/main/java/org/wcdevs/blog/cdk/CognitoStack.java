@@ -84,7 +84,8 @@ public final class CognitoStack extends Stack {
 
     var clientsSecretBaseName = joinedString(DASH_JOINER, envName, USER_POOL_CLIENT_SECRET_HOLDER);
     createUserPoolClients(cognitoStack, userPool, inParams.getUserPoolClientConfigurations())
-        // and
+        .filter(UserPoolClientWrapper::isSecretGenerated)
+        .map(UserPoolClientWrapper::getClient)
         .forEach(client -> {
           var secretArn = createUserPoolClientSecret(cognitoStack, region,
                                                      userPool.getUserPoolId(),
@@ -103,8 +104,9 @@ public final class CognitoStack extends Stack {
     return cognitoStack;
   }
 
-  private static Stream<UserPoolClient> createUserPoolClients(Stack scope, IUserPool userPool,
-                                                              Collection<UserPoolClientParameter> clientParams) {
+  private static Stream<UserPoolClientWrapper> createUserPoolClients(Stack scope,
+                                                                     IUserPool userPool,
+                                                                     Collection<UserPoolClientParameter> clientParams) {
     return clientParams.stream().map(clientParam -> userPoolClient(scope, userPool, clientParam));
   }
 
@@ -161,8 +163,8 @@ public final class CognitoStack extends Stack {
                            .build();
   }
 
-  private static UserPoolClient userPoolClient(Stack scope, IUserPool userPool,
-                                               UserPoolClientParameter clientParam) {
+  private static UserPoolClientWrapper userPoolClient(Stack scope, IUserPool userPool,
+                                                      UserPoolClientParameter clientParam) {
     var oauthBuilder = OAuthSettings.builder();
 
     if (!clientParam.isOauthDisabled()) {
@@ -202,9 +204,10 @@ public final class CognitoStack extends Stack {
         .enableTokenRevocation(clientParam.isTokenRevocationEnabled())
         .preventUserExistenceErrors(clientParam.isReturnGenericErrorOnLoginFailed());
 
-    return clientParam.isOauthDisabled()
-           ? builder.disableOAuth(true).build()
-           : builder.oAuth(oauthBuilder.build()).build();
+    var userPoolClient = clientParam.isOauthDisabled()
+                         ? builder.disableOAuth(true).build()
+                         : builder.oAuth(oauthBuilder.build()).build();
+    return new UserPoolClientWrapper(userPoolClient, clientParam.isGenerateSecretEnabled());
   }
 
   private static void createUserPoolDomain(Stack scope, IUserPool userPool,
@@ -444,5 +447,12 @@ public final class CognitoStack extends Stack {
   public static final class OutputParameters {
     private final String logoutUrl;
     private final String providerUrl;
+  }
+
+  @AllArgsConstructor
+  @Getter(AccessLevel.PACKAGE)
+  static final class UserPoolClientWrapper {
+    private final UserPoolClient client;
+    private final boolean secretGenerated;
   }
 }
