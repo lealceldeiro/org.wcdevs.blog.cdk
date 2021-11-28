@@ -84,15 +84,12 @@ public final class CognitoStack extends Stack {
 
     var clientsSecretBaseName = joinedString(DASH_JOINER, envName, USER_POOL_CLIENT_SECRET_HOLDER);
     createUserPoolClients(cognitoStack, userPool, inParams.getUserPoolClientConfigurations())
-        .filter(UserPoolClientWrapper::isSecretGenerated)
-        .map(UserPoolClientWrapper::getClient)
-        .forEach(client -> {
-          var secretArn = createUserPoolClientSecret(cognitoStack, region,
-                                                     userPool.getUserPoolId(),
-                                                     client.getUserPoolClientId(),
-                                                     client.getUserPoolClientName(),
-                                                     clientsSecretBaseName);
-          var arnParamHolder = clientSecretArnParamHolder(client.getUserPoolClientName());
+        // and
+        .forEach(clientWrapper -> {
+          var secretArn = createUserPoolClientSecret(cognitoStack, region, userPool.getUserPoolId(),
+                                                     clientWrapper, clientsSecretBaseName);
+          var clientName = clientWrapper.getClient().getUserPoolClientName();
+          var arnParamHolder = clientSecretArnParamHolder(clientName);
           createStringParameter(cognitoStack, envName, arnParamHolder, secretArn);
         });
 
@@ -245,10 +242,14 @@ public final class CognitoStack extends Stack {
   }
 
   private static String createUserPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
-                                                   String userPoolClientId, String clientName,
+                                                   UserPoolClientWrapper clientWrapper,
                                                    String secretName) {
-    var userPoolClientSecretValue = userPoolClientSecretValue(scope, awsRegion, userPoolId,
-                                                              userPoolClientId, clientName);
+    var userPoolClientId = clientWrapper.getClient().getUserPoolClientId();
+    var clientName = clientWrapper.getClient().getUserPoolClientName();
+    var userPoolClientSecretValue = clientWrapper.isSecretGenerated()
+                                    ? userPoolClientSecretValue(scope, awsRegion, userPoolId,
+                                                                userPoolClientId, clientName)
+                                    : "";
     var secretTpl = String.format("{\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\",\"%s\": \"%s\"}",
                                   USER_POOL_ID_HOLDER, userPoolId,
                                   USER_POOL_CLIENT_ID_HOLDER, userPoolClientId,
