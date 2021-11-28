@@ -154,6 +154,7 @@ class CognitoStackTest {
       var flowClientCredentialsEnabled = random.nextBoolean();
       var refreshTokenValidity = mock(Duration.class);
       var oauthDisabled = random.nextBoolean();
+      var generateSecretEnabled = random.nextBoolean();
 
       var input = CognitoStack.UserPoolClientParameter
           .builder()
@@ -170,6 +171,7 @@ class CognitoStackTest {
           .refreshTokenValidity(refreshTokenValidity)
           .tokenRevocationEnabled(tokenRevocationEnabled)
           .returnGenericErrorOnLoginFailed(returnGenericErrorOnLoginFailed)
+          .generateSecretEnabled(generateSecretEnabled)
           .oauthDisabled(oauthDisabled)
           .build();
 
@@ -195,6 +197,7 @@ class CognitoStackTest {
       var flowEnabled = flowAuthorizationCodeGrantEnabled || flowClientCredentialsEnabled
                         || flowImplicitCodeGrantEnabled;
       assertEquals(flowEnabled, input.isThereAFlowEnabled());
+      assertEquals(generateSecretEnabled, input.isGenerateSecretEnabled());
       assertTrue(input.isThereAScopeConfigured());
     });
   }
