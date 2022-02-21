@@ -20,7 +20,7 @@
     <lombok.version>1.18.22</lombok.version>
     <cdk.version>1.137.0</cdk.version>
     <junit.version>5.8.2</junit.version>
-    <mockito.version>4.2.0</mockito.version>
+    <mockito.version>4.3.1</mockito.version>
   </properties>
 
   <organization>
