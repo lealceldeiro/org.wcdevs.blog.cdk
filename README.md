@@ -5,7 +5,7 @@
 Holds CDK constructs with an opinionated AWS CDK configured resources which provides capabilities
 to define AWS cloud resources. Many of the configuration can be modified via input arguments.
 
-Users of this library, depending also on the AWS CDK itself must use version `1.137.0` of the
+Users of this library, depending also on the AWS CDK itself must use version `1.146.0` of the
 [AWS CDK](https://mvnrepository.com/artifact/software.amazon.awscdk). 
 
 This is a [Maven](https://maven.apache.org/) based project, so you can open it with any Maven
