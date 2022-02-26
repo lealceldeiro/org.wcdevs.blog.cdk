@@ -18,7 +18,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <lombok.version>1.18.22</lombok.version>
-    <cdk.version>1.137.0</cdk.version>
+    <cdk.version>1.146.0</cdk.version>
     <junit.version>5.8.2</junit.version>
     <mockito.version>4.3.1</mockito.version>
   </properties>
