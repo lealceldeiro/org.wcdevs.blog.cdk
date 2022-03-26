@@ -2,8 +2,8 @@ package org.wcdevs.blog.cdk;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import software.amazon.awscdk.core.IConstruct;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.Tags;
+import software.constructs.IConstruct;
 
 @Getter
 @RequiredArgsConstructor

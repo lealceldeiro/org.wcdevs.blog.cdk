@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroup;
 import software.amazon.awscdk.services.rds.CfnDBInstance;
 import software.amazon.awscdk.services.rds.CfnDBSubnetGroup;
@@ -15,6 +14,7 @@ import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
 import software.amazon.awscdk.services.ssm.StringParameter;
+import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Objects;

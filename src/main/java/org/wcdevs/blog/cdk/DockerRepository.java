@@ -3,13 +3,13 @@ package org.wcdevs.blog.cdk;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.RemovalPolicy;
+import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.services.ecr.IRepository;
 import software.amazon.awscdk.services.ecr.LifecycleRule;
 import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecr.TagMutability;
 import software.amazon.awscdk.services.iam.AccountPrincipal;
+import software.constructs.Construct;
 
 import java.util.Objects;
 

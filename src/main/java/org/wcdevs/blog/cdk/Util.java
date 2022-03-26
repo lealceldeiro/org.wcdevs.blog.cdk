@@ -1,8 +1,8 @@
 package org.wcdevs.blog.cdk;
 
-import software.amazon.awscdk.core.App;
-import software.amazon.awscdk.core.Environment;
-import software.amazon.awscdk.core.IConstruct;
+import software.amazon.awscdk.App;
+import software.amazon.awscdk.Environment;
+import software.constructs.IConstruct;
 
 import java.util.Arrays;
 import java.util.Objects;

@@ -1,13 +1,13 @@
 package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.api.Test;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.SecretValue;
+import software.amazon.awscdk.SecretValue;
 import software.amazon.awscdk.services.rds.StorageType;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.ssm.IStringParameter;
 import software.amazon.awscdk.services.ssm.StringParameter;
+import software.constructs.Construct;
 
 import java.security.SecureRandom;
 import java.util.List;

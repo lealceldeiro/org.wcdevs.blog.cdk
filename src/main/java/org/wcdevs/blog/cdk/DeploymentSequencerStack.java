@@ -2,9 +2,9 @@ package org.wcdevs.blog.cdk;
 
 import lombok.AccessLevel;
 import lombok.Getter;
-import software.amazon.awscdk.core.Environment;
-import software.amazon.awscdk.core.Stack;
-import software.amazon.awscdk.core.StackProps;
+import software.amazon.awscdk.Environment;
+import software.amazon.awscdk.Stack;
+import software.amazon.awscdk.StackProps;
 import software.amazon.awscdk.services.events.targets.LambdaFunction;
 import software.amazon.awscdk.services.lambda.Code;
 import software.amazon.awscdk.services.lambda.Function;
