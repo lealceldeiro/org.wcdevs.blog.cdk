@@ -15,6 +15,7 @@ document in a pull request.
 * [Reporting Bugs](#reporting-bugs)
 * [Suggesting Enhancements](#suggesting-enhancements)
 * [Pull Requests](#pull-requests)
+* [Git flow](#git-flow)
 
 ## Code of Conduct
 
@@ -108,3 +109,65 @@ the failure is unrelated.</details>
 While the prerequisites above must be satisfied prior to having your pull request reviewed, the
 reviewer(s) may ask you to complete additional design work, tests, or other changes before your pull
 request can be ultimately accepted.
+
+### Git flow
+
+#### Branch names and commit messages convention
+
+Branch names should follow the following pattern:
+
+```text
+<type>/<ITEM ID>?-brief-subject-separated-with-dashes
+```
+
+To have a consistent git history the commit messages should follow the following pattern:
+```text
+<type>(US-?#?<ITEM ID>?): <subject>
+```
+
+##### `<type>` should be one of:
+
+- `build`: Changes that affect the build system or external dependencies (example scopes: Maven)
+- `ci`: Changes to our CI configuration files and scripts (example scopes: GitHub actions)
+- `chore`: Changes to the build process or auxiliary tools and libraries such as documentation generation
+- `docs`: Documentation only changes
+- `feat`: A new feature
+- `fix`: A bug fix
+- `perf`: A code change that improves performance
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `revert`: A commit that reverts a previous one
+- `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc.)
+- `test`: Adding missing tests or correcting existing tests
+
+#### `<ITEM ID>` -- Optional, the related issue, user story or defect
+
+It can be preceded by `#`, example `feat(#237): User subscription`
+
+- For user stories, you should use `US-` as prefix. i.e.: `feat(US-237): User subscription`
+- For non-related issues or defects you should leave it blank. i.e:
+  `refactor: Improve code style in SecurityConfig class`
+
+#### `<subject>`
+
+The subject contains a succinct description of the change.
+
+#### Helping to ensure these practices
+To help you ensure these practices there are some (shell scripts) git hooks in [`scrips/git/hooks`](./scripts/git/hooks)
+that you can copy to your local copy of the project inside the appropriate directory (`<root_dir>/.git/hooks`), so they're
+executed by git in each phase ([see docs for more info](https://git-scm.com/docs/githooks)).
+
+These hooks will override any custom hook you'd had defined already with the same name, so, you can
+check first the names of the files before copying them. So, to do so (in a unix environment),
+execute
+
+```shell
+cp -r scripts/git/hooks .git
+chmod +x -R .git/hooks
+```
+
+For more info about these commands check [cp-invocation](http://www.gnu.org/software/coreutils/cp)
+and [chmod-invocation](http://www.gnu.org/software/coreutils/chmod).
+
+These are not hard rules, but rather best practices, so, if you enable these git hooks in your local
+copy of the project, and later you need to bypass any of them, you can use the `--no-verify` option
+(although it's highly discouraged to do so) -- example: `git push --no-verify`.

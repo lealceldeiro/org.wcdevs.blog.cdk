@@ -2,10 +2,10 @@ package org.wcdevs.blog.cdk;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Environment;
+import software.amazon.awscdk.Environment;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
+import software.constructs.Construct;
 
 import java.util.UUID;
 

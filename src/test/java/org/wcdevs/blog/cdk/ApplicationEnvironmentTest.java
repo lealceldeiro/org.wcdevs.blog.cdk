@@ -1,9 +1,8 @@
 package org.wcdevs.blog.cdk;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.Tags;
+import software.constructs.Construct;
 
 import java.util.UUID;
 

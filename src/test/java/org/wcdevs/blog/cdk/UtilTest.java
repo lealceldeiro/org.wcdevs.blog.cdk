@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.awscdk.core.App;
-import software.amazon.awscdk.core.ConstructNode;
+import software.amazon.awscdk.App;
+import software.constructs.Node;
 
 import java.time.ZonedDateTime;
 import java.util.UUID;
@@ -64,7 +64,7 @@ class UtilTest {
   @Test
   void getValueInAppReturnsNullOK() {
     StaticallyMockedCdk.executeTest(() -> {
-      var node = mock(ConstructNode.class);
+      var node = mock(Node.class);
       var app = mock(App.class);
       when(app.getNode()).thenReturn(node);
 
@@ -87,12 +87,12 @@ class UtilTest {
     StaticallyMockedCdk.executeTest(() -> {
       var appWithNullNode = mock(App.class);
 
-      var node = nullNode ? null : mock(ConstructNode.class);
+      var node = nullNode ? null : mock(Node.class);
       var appWithNullValue = mock(App.class);
       when(appWithNullValue.getNode()).thenReturn(node);
 
       var nodeValue = randomString();
-      var nodeWithValue = nullNode ? null : mock(ConstructNode.class);
+      var nodeWithValue = nullNode ? null : mock(Node.class);
       if (!nullNode) {
         when(nodeWithValue.tryGetContext(any())).thenReturn(nodeValue);
       }
@@ -111,7 +111,7 @@ class UtilTest {
   void getValueInAppReturnsNotNullOK() {
     StaticallyMockedCdk.executeTest(() -> {
       var expected = randomString();
-      var node = mock(ConstructNode.class);
+      var node = mock(Node.class);
       when(node.tryGetContext(any())).thenReturn(expected);
 
       var app = mock(App.class);
@@ -125,7 +125,7 @@ class UtilTest {
   void getValueInAppRequireNotNullValueReturnsOk() {
     StaticallyMockedCdk.executeTest(() -> {
       var expected = randomString();
-      var node = mock(ConstructNode.class);
+      var node = mock(Node.class);
       when(node.tryGetContext(any())).thenReturn(expected);
 
       var app = mock(App.class);
@@ -139,7 +139,7 @@ class UtilTest {
   @MethodSource("keyValueMockAppAndReturnedMock")
   void getValueInAppThrowsNPEIfArgumentIsNull(String valueKey, boolean nullApp, Object expected) {
     StaticallyMockedCdk.executeTest(() -> {
-      var node = mock(ConstructNode.class);
+      var node = mock(Node.class);
       when(node.tryGetContext(any())).thenReturn(expected);
 
       var app = mock(App.class);

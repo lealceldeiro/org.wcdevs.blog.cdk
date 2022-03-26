@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.ISubnet;
@@ -31,6 +30,7 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
 import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.TargetType;
 import software.amazon.awscdk.services.ssm.StringParameter;
+import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Objects;
@@ -199,7 +199,7 @@ public final class Network extends Construct {
 
     var isolatedSubnetsNamePrefix = applicationEnvironment.prefixed(PARAM_ISOLATED_SUBNETS);
     var isolatedSubnets = subnetsStreamFrom(numberOfIsolatedSubnetsPerAZ, isolatedSubnetsNamePrefix,
-                                            SubnetType.ISOLATED);
+                                            SubnetType.PRIVATE_ISOLATED);
 
     var publicSubnetsNamePrefix = applicationEnvironment.prefixed(PARAM_PUBLIC_SUBNETS);
     var publicSubnets = subnetsStreamFrom(numberOfPublicSubnetsPerAZ, publicSubnetsNamePrefix,

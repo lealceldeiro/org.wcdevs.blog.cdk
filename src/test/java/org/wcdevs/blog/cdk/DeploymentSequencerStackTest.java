@@ -3,13 +3,13 @@ package org.wcdevs.blog.cdk;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Environment;
+import software.amazon.awscdk.Environment;
 import software.amazon.awscdk.services.lambda.AssetCode;
 import software.amazon.awscdk.services.lambda.Code;
 import software.amazon.awscdk.services.lambda.FunctionProps;
 import software.amazon.awscdk.services.lambda.Runtime;
 import software.amazon.awscdk.services.logs.RetentionDays;
+import software.constructs.Construct;
 
 import java.security.SecureRandom;
 import java.util.Random;
