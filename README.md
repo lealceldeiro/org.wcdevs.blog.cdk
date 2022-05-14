@@ -5,10 +5,10 @@
 Holds CDK constructs with an opinionated AWS CDK configured resources which provides capabilities
 to define AWS cloud resources. Many of the configuration can be modified via input arguments.
 
-Users of this library, should use the following versions of these dependencies as well
+Users of this library, should use Java 17+ and the following versions of these dependencies as well
 
-- [software.amazon.awscdk:aws-cdk-lib:2.18.0](https://mvnrepository.com/artifact/software.amazon.awscdk/aws-cdk-lib).
-- [software.constructs:constructs:10.0.101](https://mvnrepository.com/artifact/software.constructs/constructs)
+- [software.amazon.awscdk:aws-cdk-lib:2.24.0](https://mvnrepository.com/artifact/software.amazon.awscdk/aws-cdk-lib).
+- [software.constructs:constructs:10.1.7](https://mvnrepository.com/artifact/software.constructs/constructs)
 
 This is a [Maven](https://maven.apache.org/) based project, so you can open it with any Maven
 compatible Java IDE to build and run tests.
