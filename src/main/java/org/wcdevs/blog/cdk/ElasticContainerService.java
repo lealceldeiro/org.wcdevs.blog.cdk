@@ -328,7 +328,7 @@ public final class ElasticContainerService extends Construct {
                                                                                               ) {
     return source.entrySet().stream()
                  .map(ElasticContainerService::cfnTaskDefKeyValuePropertyFrom)
-                 .collect(Collectors.toList());
+                 .toList();
   }
 
   private static CfnTaskDefinition.KeyValuePairProperty cfnTaskDefKeyValuePropertyFrom(
