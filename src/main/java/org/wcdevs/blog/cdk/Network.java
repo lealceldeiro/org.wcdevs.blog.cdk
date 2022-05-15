@@ -36,12 +36,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
 import static org.wcdevs.blog.cdk.Util.DASH_JOINER;
 import static org.wcdevs.blog.cdk.Util.joinedString;
 import static org.wcdevs.blog.cdk.Util.string;
@@ -205,7 +203,7 @@ public final class Network extends Construct {
     var publicSubnets = subnetsStreamFrom(numberOfPublicSubnetsPerAZ, publicSubnetsNamePrefix,
                                           SubnetType.PUBLIC);
 
-    var subnetConfig = Stream.concat(isolatedSubnets, publicSubnets).collect(toList());
+    var subnetConfig = Stream.concat(isolatedSubnets, publicSubnets).toList();
 
     return Vpc.Builder.create(scope, "vpc")
                       .natGateways(natGatewayNumber)
@@ -452,7 +450,7 @@ public final class Network extends Construct {
                     .mapToObj(i -> getParameter(scope, applicationEnvironment,
                                                 idForParameterListItem(id, i)))
                     .filter(Objects::nonNull)
-                    .collect(Collectors.toUnmodifiableList());
+                    .toList();
   }
 
   public static List<String> getAvailabilityZones(Construct scope,

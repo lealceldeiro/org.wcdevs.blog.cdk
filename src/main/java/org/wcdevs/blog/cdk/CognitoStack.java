@@ -238,7 +238,7 @@ public final class CognitoStack extends Stack {
   private static <T> List<T> join(Collection<? extends T> additional, T... elements) {
     return Stream.concat(Stream.of(Objects.requireNonNull(elements)),
                          Optional.ofNullable(additional).orElse(emptyList()).stream())
-                 .collect(toList());
+                 .toList();
   }
 
   private static String createUserPoolClientSecret(Stack scope, String awsRegion, String userPoolId,
