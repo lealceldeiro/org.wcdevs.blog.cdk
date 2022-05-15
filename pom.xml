@@ -4,7 +4,7 @@
 
   <groupId>org.wcdevs.blog</groupId>
   <artifactId>cdk</artifactId>
-  <version>3.0.0-SNAPSHOT</version>
+  <version>3.0.0</version>
   <packaging>jar</packaging>
 
   <name>wcDevs.org AWS CDK Constructs</name>
@@ -56,7 +56,7 @@
     <developerConnection>scm:git:https://github.com/lealceldeiro/org.wcdevs.blog.cdk.git
     </developerConnection>
     <url>https://github.com/lealceldeiro/org.wcdevs.blog.cdk</url>
-    <tag>org.wcdevs.blog.cdk-${project.version}</tag>
+    <tag>cdk-3.0.0</tag>
   </scm>
 
   <distributionManagement>
